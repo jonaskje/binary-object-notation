@@ -1,21 +1,23 @@
 #pragma once
 
+#pragma warning(push)
+#pragma warning(disable : 4001)
 #include <stdlib.h>
 #include <stdint.h>
+#pragma warning(pop)
+
+#pragma warning(push)
+#pragma warning(disable : 4820) /* N bytes padding added after data member X */
 
 typedef uint64_t		BonValue;
 typedef uint32_t		BonName;
 typedef int			BonBool;
 
-typedef struct BonContext {
-	int			statusCode;
-} BonContext;
-
 typedef struct BonRecord {
 	uint16_t		magic;
 	uint8_t			version;
 	uint8_t			flags;
-	BonValue		nameHashObject;		// A nameString to nameHash lookup dictionary
+	BonValue		nameHashObject;		/* A nameString to nameHash lookup dictionary */
 } BonRecord;
 
 typedef struct BonObject {
@@ -29,12 +31,12 @@ typedef struct BonArray {
 	const BonValue*		values;
 } BonArray;
 
-#define BON_VT_NULL		0
+#define BON_VT_NUMBER		0
 #define BON_VT_BOOL		1
-#define BON_VT_NUMBER		2
 #define BON_VT_STRING		3
 #define BON_VT_ARRAY		4
 #define BON_VT_OBJECT		5
+#define BON_VT_NULL		9
 
 #define BON_FALSE		0
 #define BON_TRUE		1
@@ -43,28 +45,25 @@ typedef struct BonArray {
 #define BON_STATUS_INVALID_JSON_TEXT	1
 #define BON_STATUS_JSON_PARSE_ERROR	2
 #define BON_STATUS_JSON_NOT_UTF8	3
+#define BON_STATUS_OUT_OF_MEMORY	4
 
-/* Context */
-
-void				BonInitContext(BonContext* ctx);
-int				BonGetAndClearStatus(BonContext* ctx);
 
 /* Reading */
 
-BonBool				BonIsAValidRecord(BonContext* ctx, BonRecord* br, size_t sizeBytes);
+BonBool				BonIsAValidRecord(BonRecord* br, size_t sizeBytes);
 
-const char*			BonGetNameString(BonContext* ctx, BonRecord* br, BonName name);
-BonValue*			BonGetRootValue(BonContext* ctx, BonRecord* br);
+const char*			BonGetNameString(BonRecord* br, BonName name);
+BonValue*			BonGetRootValue(BonRecord* br);
 
-int				BonGetValueType(BonContext* ctx, BonValue* value);
+int				BonGetValueType(BonValue* value);
 
-BonObject			BonAsObject(BonContext* ctx, const BonValue* bv);
-BonArray			BonAsArray(BonContext* ctx, const BonValue* bv);
-double				BonAsNumber(BonContext* ctx, const BonValue* bv);
-const char*			BonAsString(BonContext* ctx, const BonValue* bv);
-BonBool				BonAsBool(BonContext* ctx, const BonValue* bv);
+BonObject			BonAsObject(const BonValue* bv);
+BonArray			BonAsArray(const BonValue* bv);
+double				BonAsNumber(const BonValue* bv);
+const char*			BonAsString(const BonValue* bv);
+BonBool				BonAsBool(const BonValue* bv);
 
-const double*			BonAsNumberArray(BonContext* ctx, const BonArray* ba);
+const double*			BonAsNumberArray(const BonArray* ba);
 
 /* Creating */
 
@@ -73,9 +72,17 @@ typedef void* (*BonTempMemoryAllocator)(size_t byteCount);
 
 struct BonParsedJson;
 
-struct BonParsedJson*		BonParseJson(BonContext* ctx, BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount);
-size_t				BonGetBonRecordSize(BonContext* ctx, struct BonParsedJson* parsedJson);
-const BonRecord*		BonCreateRecordFromParsedJson(BonContext* ctx, struct BonParsedJson* parsedJson, void* recordMemory);
+/* Return NULL if first allocation from tempAllocator fails or if tempAllocator is NULL. 
+ * Return a valid object otherwise that may or may not have failed.
+ * Check for failure with BonGetParsedJsonStatus.
+ * If a valid object is returned, then the memory allocated from tempAllocator must be cleaned up by the caller.
+ */
+struct BonParsedJson*		BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount);
+int				BonGetParsedJsonStatus(struct BonParsedJson* parsedJson);
+size_t				BonGetBonRecordSize(struct BonParsedJson* parsedJson);
+const BonRecord*		BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory);
 
 /* Return a BonRecord allocated with standard malloc. */
-const BonRecord*		BonCreateRecordFromJson(BonContext* ctx, const char* jsonString, size_t jsonStringByteCount);
+const BonRecord*		BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount);
+
+#pragma warning(pop)

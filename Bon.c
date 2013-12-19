@@ -1,41 +1,29 @@
 #include "Bon.h"
+
+#pragma warning(push)
+#pragma warning(disable : 4001)	/* Single line comments */
+#pragma warning(disable : 4820) /* N bytes padding added after data member X */
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
 #include <assert.h>
 #include <string.h>
 #include <stddef.h>
+#include <setjmp.h>
+#include <stdio.h>
+#pragma warning(pop)
 
-/*---------------------------------------------------------------------------*/
-/* :Internal */
-
-static void
-SetStatusCode(BonContext* ctx, int code) {
-	ctx->statusCode = code;
-}
-
-static BonBool
-IsInFailState(BonContext* ctx) {
-	return ctx->statusCode != BON_STATUS_OK;
-}
-
-/*---------------------------------------------------------------------------*/
-/* :Context */
-
-void				
-BonInitContext(BonContext* ctx) {
-	ctx->statusCode = BON_STATUS_OK;
-}
-
-int				
-BonGetAndClearStatus(BonContext* ctx) {
-	int s = ctx->statusCode;
-	ctx->statusCode = BON_STATUS_OK;
-	return s;
-}
+#pragma warning(push)
+#pragma warning(disable : 4127)	/* Conditional expression is constant */
+#pragma warning(disable : 4820) /* N bytes padding added after data member X */
+#pragma warning(disable : 4100) /* Unreferenced formal parameter */
 
 /*---------------------------------------------------------------------------*/
 /* :Reading */
 
 const char*
-BonGetNameString(BonContext* ctx, BonRecord* br, BonName name) {
+BonGetNameString(BonRecord* br, BonName name) {
+	assert(0);
 	return 0;
 }
 
@@ -52,10 +40,10 @@ typedef struct BonStringEntry {
 
 typedef struct BonVariant {
 	union {
+		BonBool			boolValue;
 		double			numberValue;
 		struct BonObjectEntry*	objectValue;
 		struct BonArrayEntry*	arrayValue;
-		BonBool			boolValue;
 		BonStringEntry*		stringValue;
 	} value;
 	int			type;
@@ -79,21 +67,36 @@ typedef struct BonParsedJson {
 	BonTempMemoryAllocator	alloc;
 	const uint8_t*		jsonString;
 	const uint8_t*		jsonStringEnd;
-	BonContext*		ctx;
 
 	/* Parse context */
 	const uint8_t*		cursor;
+	jmp_buf*		env;
 
 	/* Results */
+	int			status;
 	size_t			bonRecordSize;
 	BonVariant		rootValue;
 } BonParsedJson;
 
-#define BonTempCalloc(tempAllocator, type) ((type*)memset(tempAllocator(sizeof(type)), 0, sizeof(type)))
+static void
+GiveUp(jmp_buf* env, int status) {
+	longjmp(*env, status);
+}
+
+static void*
+DoTempCalloc(BonTempMemoryAllocator alloc, jmp_buf* exceptionEnv, size_t size) {
+	void* result = alloc(size);
+	if (!result) {
+		GiveUp(exceptionEnv, BON_STATUS_OUT_OF_MEMORY);
+	}
+	return memset(result, 0, size);
+}
+
+#define BonTempCalloc(tempAllocator, exceptionEnv, type) ((type*)DoTempCalloc(tempAllocator, exceptionEnv, sizeof(type)))
 
 static BonObjectEntry*
 CreateObjectEntry(BonParsedJson* pj) {
-	BonObjectEntry* obj = BonTempCalloc(pj->alloc, BonObjectEntry);
+	BonObjectEntry* obj = BonTempCalloc(pj->alloc, pj->env, BonObjectEntry);
 	obj->next = obj;
 	obj->prev = obj;
 	return obj;
@@ -101,7 +104,7 @@ CreateObjectEntry(BonParsedJson* pj) {
 
 static BonArrayEntry*
 CreateArrayEntry(BonParsedJson* pj) {
-	BonArrayEntry* obj = BonTempCalloc(pj->alloc, BonArrayEntry);
+	BonArrayEntry* obj = BonTempCalloc(pj->alloc, pj->env, BonArrayEntry);
 	obj->next = obj;
 	obj->prev = obj;
 	return obj;
@@ -139,47 +142,41 @@ SkipWhitespace(BonParsedJson* pj) {
 	}
 }
 
-static BonBool
-IsUnexpectedEof(BonParsedJson* pj) {
+static void
+FailIfEof(BonParsedJson* pj) {
 	if (pj->cursor == pj->jsonStringEnd) {
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-		return BON_TRUE;
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
 	}
-	return BON_FALSE;
 }
 
-static BonBool
-ParseExpectedChar(BonParsedJson* pj, uint8_t c) {
+static void
+FailUnlessCharIs(BonParsedJson* pj, uint8_t c) {
 	assert(pj->cursor != pj->jsonStringEnd);
 	if (*pj->cursor++ != c) {
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-		return BON_FALSE;
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
 	}
-	return BON_TRUE;
 }
 
 static BonBool
 PeekChar(BonParsedJson* pj, uint8_t c) {
-	if (IsUnexpectedEof(pj)) {
-		return BON_FALSE;
-	}
+	FailIfEof(pj);
 	return *pj->cursor == c ? BON_TRUE : BON_FALSE;
 }
 
-static BonStringEntry*
-ParseString(BonParsedJson* pj) {
+static void
+ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 	BonStringEntry* stringEntry = 0;
 	const uint8_t* string = 0;
-	const uint8_t* stringEnd = 0; 
+	const uint8_t* stringEnd = 0;
 	uint8_t* dstString;
 	size_t bufferSize;
 	size_t stringBufferSize;
-	if (!ParseExpectedChar(pj, '\"'))
-		goto returnEmptyString;
+	FailUnlessCharIs(pj, '\"');
 	string = pj->cursor;
 
 	/* Scan for the end of the string */
-	while (!IsUnexpectedEof(pj)) {
+	for (;;) {
+		FailIfEof(pj);
 		if (pj->cursor[0] == '\"' && pj->cursor[-1] != '\\') {
 			stringEnd = pj->cursor++;
 			break;
@@ -187,11 +184,8 @@ ParseString(BonParsedJson* pj) {
 		++pj->cursor;
 	}
 
-	if (IsInFailState(pj->ctx))
-		goto returnEmptyString;
-
 	stringBufferSize =
-		+ (stringEnd - string)		/* Min length of string in bytes */
+		+(stringEnd - string)		/* Min length of string in bytes */
 		+ 1;				/* Space for a terminating null */
 
 	bufferSize = offsetof(BonStringEntry, utf8) + stringBufferSize;
@@ -200,17 +194,19 @@ ParseString(BonParsedJson* pj) {
 	stringEntry = (BonStringEntry*)(pj->alloc)(bufferSize);
 	stringEntry->byteCount = 0;
 
+	/* Immediately link the new string entry to the parent to avoid orphaning if the parsing below fails. */
+	*pstringEntry = stringEntry;
+
 	dstString = stringEntry->utf8;
 
 	/* TODO: UTF-8. Just ASCII for now */
 	while (string != stringEnd) {
 		uint8_t c = *string++;
-		
+
 		if (c == 0x5Cu) {
 			uint8_t c2;
 			if (string == stringEnd) {
-				SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-				goto clearAndReturnString;
+				GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
 			}
 
 			c2 = *string++;
@@ -218,7 +214,7 @@ ParseString(BonParsedJson* pj) {
 			case 0x22u: /* \" */
 			case 0x5Cu: /* \\ */
 			case 0x2Fu: /* \/ */
-				*dstString++ = c2;		
+				*dstString++ = c2;
 				break;
 			case 0x62u: /* \b */
 				*dstString++ = +0x08u;
@@ -239,105 +235,18 @@ ParseString(BonParsedJson* pj) {
 				assert(0); /* TODO: Unicode escape */
 				break;
 			}
-		} else if (c >= 0x20u) {
+		}
+		else if (c >= 0x20u) {
 			*dstString++ = c;
-		} else {
-			SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-			goto clearAndReturnString;
+		}
+		else {
+			GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
 		}
 	}
 
 	*dstString = 0;
 	stringEntry->byteCount = dstString - stringEntry->utf8;
-	assert(stringEntry->byteCount < stringBufferSize); 
-	return stringEntry;
-
-clearAndReturnString:
-	stringEntry->byteCount = 0;
-	stringEntry->utf8[0] = 0;
-	return stringEntry;
-
-returnEmptyString:
-	return BonTempCalloc(pj->alloc, BonStringEntry);
-}
-
-static BonVariant s_nullVariant;
-
-static BonVariant
-ParseFalseValue(BonParsedJson* pj) {
-	BonVariant v;
-	if (pj->cursor + 5 > pj->jsonStringEnd || 0 != memcmp("false", pj->cursor, 5)) {
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-		return s_nullVariant;
-	}
-	pj->cursor += 5;
-	v.type = BON_VT_BOOL;
-	v.value.boolValue = BON_FALSE;
-	return v;
-}
-
-static BonVariant
-ParseTrueValue(BonParsedJson* pj) {
-	BonVariant v;
-	if (pj->cursor + 4 > pj->jsonStringEnd || 0 != memcmp("true", pj->cursor, 4)) {
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-		return s_nullVariant;
-	}
-	pj->cursor += 4;
-	v.type = BON_VT_BOOL;
-	v.value.boolValue = BON_TRUE;
-	return v;
-}
-
-static BonVariant
-ParseNullValue(BonParsedJson* pj) {
-	if (pj->cursor + 4 > pj->jsonStringEnd || 0 != memcmp("null", pj->cursor, 4)) {
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);
-	}
-	pj->cursor += 4;
-	return s_nullVariant;
-}
-
-
-static BonVariant
-ParseObjectValue(BonParsedJson* pj) {
-	assert(0);
-	return s_nullVariant;
-}
-
-static BonVariant
-ParseArrayValue(BonParsedJson* pj) {
-	assert(0);
-	return s_nullVariant;
-}
-
-static BonVariant
-ParseStringValue(BonParsedJson* pj) {
-	assert(0);
-	return s_nullVariant;
-}
-
-static BonVariant
-ParseNumberValue(BonParsedJson* pj) {
-	assert(0);
-	return s_nullVariant;
-}
-
-static BonVariant
-ParseValue(BonParsedJson* pj) {
-	if (IsUnexpectedEof(pj)) {
-		return s_nullVariant;
-	}
-
-	switch (*pj->cursor) {
-	case 'f':	return ParseFalseValue(pj);
-	case 't':	return ParseTrueValue(pj);
-	case 'n':	return ParseNullValue(pj);
-	case '{':	return ParseObjectValue(pj);
-	case '[':	return ParseArrayValue(pj);
-	case '\"':	return ParseStringValue(pj);
-	default:	return ParseNumberValue(pj);
-	}
+	assert(stringEntry->byteCount < stringBufferSize);
 }
 
 #define BonAppendToList(head, obj) do { \
@@ -347,56 +256,148 @@ ParseValue(BonParsedJson* pj) {
 		(head)->prev = (obj); \
 	} while(0)
 	
+static void			ParseValue(BonParsedJson* pj, BonVariant* value);
+static void			ParseObject(BonParsedJson* pj, BonObjectEntry* object);
+static void			ParseArray(BonParsedJson* pj, BonArrayEntry* array);
 
-static void
-AppendObjectMember(BonParsedJson* pj, BonObjectEntry* objectHead, BonStringEntry* name, BonVariant value) {
+static BonVariant		s_nullVariant		= { BON_VT_NULL, 0 };
+static BonVariant		s_boolFalseVariant	= { BON_VT_BOOL, BON_FALSE };
+static BonVariant		s_boolTrueVariant	= { BON_VT_BOOL, BON_TRUE };
+
+static BonObjectEntry*
+AppendObjectMember(BonParsedJson* pj, BonObjectEntry* objectHead) {
 	BonObjectEntry* member = CreateObjectEntry(pj);
-	member->name = name;
-	member->value = value;
+	member->name = 0;
+	member->value = s_nullVariant;
 	BonAppendToList(objectHead, member);
+	return member;
 }
 
 static void
 ParseObject(BonParsedJson* pj, BonObjectEntry* object) {
-	BonStringEntry*		name;
-	BonVariant		value;
-	if (IsUnexpectedEof(pj)) {
-		return;
-	}
-	if (!ParseExpectedChar(pj, '{')) {
-		return;
-	}
+	FailIfEof(pj);
+	FailUnlessCharIs(pj, '{');
 	SkipWhitespace(pj);
 	if (PeekChar(pj, '}')) {
 		goto done;
 	}
-	while (!IsInFailState(pj->ctx)) {
-		name = ParseString(pj);
+	for(;;) {
+		BonObjectEntry* member = AppendObjectMember(pj, object);
+		ParseString(pj, &member->name);
 		SkipWhitespace(pj);
-		ParseExpectedChar(pj, ':');
+		FailUnlessCharIs(pj, ':');
 		SkipWhitespace(pj);
-		value = ParseValue(pj);
-		AppendObjectMember(pj, object, name, value);
+		ParseValue(pj, &member->value);
 		SkipWhitespace(pj);
 		if (!PeekChar(pj, ','))
 			break;
-		ParseExpectedChar(pj, ',');
+		FailUnlessCharIs(pj, ',');
 		SkipWhitespace(pj);
 	}
 done:
-	if (!ParseExpectedChar(pj, '}')) {
-		return;
-	}
+	FailUnlessCharIs(pj, '}');
+}
+
+static BonArrayEntry*
+AppendArrayMember(BonParsedJson* pj, BonArrayEntry* objectHead) {
+	BonArrayEntry* member = CreateArrayEntry(pj);
+	member->value = s_nullVariant;
+	BonAppendToList(objectHead, member);
+	return member;
 }
 
 static void
 ParseArray(BonParsedJson* pj, BonArrayEntry* array) {
+	FailIfEof(pj);
+	FailUnlessCharIs(pj, '[');
+	SkipWhitespace(pj);
+	if (PeekChar(pj, ']')) {
+		goto done;
+	}
+	for (;;) {
+		BonArrayEntry* member = AppendArrayMember(pj, array);
+		ParseValue(pj, &member->value);
+		SkipWhitespace(pj);
+		if (!PeekChar(pj, ','))
+			break;
+		FailUnlessCharIs(pj, ',');
+		SkipWhitespace(pj);
+	}
+done:
+	FailUnlessCharIs(pj, ']');
+}
+
+static void
+ParseFalseValue(BonParsedJson* pj, BonVariant* value) {
+	if (pj->cursor + 5 > pj->jsonStringEnd || 0 != memcmp("false", pj->cursor, 5)) {
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
+	}
+	pj->cursor += 5;
+	*value = s_boolFalseVariant;
+}
+
+static void
+ParseTrueValue(BonParsedJson* pj, BonVariant* value) {
+	if (pj->cursor + 4 > pj->jsonStringEnd || 0 != memcmp("true", pj->cursor, 4)) {
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
+	}
+	pj->cursor += 4;
+	*value = s_boolTrueVariant;
+}
+
+static void
+ParseNullValue(BonParsedJson* pj, BonVariant* value) {
+	if (pj->cursor + 4 > pj->jsonStringEnd || 0 != memcmp("null", pj->cursor, 4)) {
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
+	}
+	pj->cursor += 4;
+	*value = s_nullVariant;
+}
+
+static void
+ParseObjectValue(BonParsedJson* pj, BonVariant* value) {
+	value->type = BON_VT_OBJECT;
+	value->value.objectValue = 0;
+	ParseObject(pj, InitObjectVariant(pj, value));
+}
+
+static void
+ParseArrayValue(BonParsedJson* pj, BonVariant* value) {
+	value->type = BON_VT_ARRAY;
+	value->value.arrayValue = 0;
+	ParseArray(pj, InitArrayVariant(pj, value));
+}
+
+static void
+ParseStringValue(BonParsedJson* pj, BonVariant* value) {
+	value->type = BON_VT_STRING;
+	value->value.stringValue = 0;
+	ParseString(pj, &value->value.stringValue);
+}
+
+static void
+ParseNumberValue(BonParsedJson* pj, BonVariant* value) {
+	assert(0);
+	*value = s_nullVariant;
+}
+
+static void
+ParseValue(BonParsedJson* pj, BonVariant* value) {
+	FailIfEof(pj);
+	switch (*pj->cursor) {
+	case 'f':	ParseFalseValue(pj, value);	break;
+	case 't':	ParseTrueValue(pj, value);	break;
+	case 'n':	ParseNullValue(pj, value);	break;
+	case '{':	ParseObjectValue(pj, value);	break;
+	case '[':	ParseArrayValue(pj, value);	break;
+	case '\"':	ParseStringValue(pj, value);	break;
+	default:	ParseNumberValue(pj, value);	break;
+	}
 }
 
 static void
 ParseObjectOrArray(BonParsedJson* pj) {
-	if (IsUnexpectedEof(pj))
-		return;
+	FailIfEof(pj);
 
 	switch(*pj->cursor) {
 	case '{':	
@@ -406,95 +407,194 @@ ParseObjectOrArray(BonParsedJson* pj) {
 		ParseArray(pj, InitArrayVariant(pj, &pj->rootValue));
 		break;
 	default:	
-		SetStatusCode(pj->ctx, BON_STATUS_JSON_PARSE_ERROR);	
+		GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);	
 		break;
 	}
 }
 
 BonParsedJson*
-BonParseJson(BonContext* ctx, BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount) {
-	BonParsedJson*		pj;
-	
-	assert(ctx);
-	assert(tempAllocator);
-	
-	pj = BonTempCalloc(tempAllocator, BonParsedJson);
-	pj->alloc		= tempAllocator;
-	pj->jsonString		= (const uint8_t*)jsonString;
-	pj->jsonStringEnd	= (const uint8_t*)jsonString + jsonStringByteCount;
-	pj->ctx			= ctx;
-	pj->cursor		= (const uint8_t*)jsonString;
-	
-	if (!jsonString || jsonStringByteCount < 2) {
-		SetStatusCode(ctx, BON_STATUS_INVALID_JSON_TEXT);
-		goto done;
-	}
+BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount) {
+	BonParsedJson*		pj = 0;
+	jmp_buf			errorJmpBuf;
+	int			status;
 
-	/* http://www.ietf.org/rfc/rfc4627.txt, section 3. Encoding
-	 * http://en.wikipedia.org/wiki/Byte_order_mark, 
-	 * Verify that string is UTF8 by checking for nulls in the first two bytes and also for non UTF8 BOMs*/
-	if (jsonString[0] == 0 || jsonString[1] == 0 || jsonString[0] == 0xFEu || jsonString[0] == 0xFFu) {
-		SetStatusCode(ctx, BON_STATUS_JSON_NOT_UTF8);
-		goto done;
-	}
+	if (!tempAllocator)
+		return 0;
 
-	/* Skip three byte UTF-8 BOM if there is one */
-	if (jsonString[0] == 0xEFu) {
-		if (jsonStringByteCount < 3 || jsonString[1] != 0xBBu || jsonString[2] != 0xBFu) {
-			SetStatusCode(ctx, BON_STATUS_INVALID_JSON_TEXT);
-			goto done;
+	status = setjmp(errorJmpBuf);
+
+	if (0 == status) {
+		pj = BonTempCalloc(tempAllocator, &errorJmpBuf, BonParsedJson);
+		if (!pj) {
+			GiveUp(&errorJmpBuf, BON_STATUS_OUT_OF_MEMORY);
+		}
+		pj->env			= &errorJmpBuf;
+		pj->alloc		= tempAllocator;
+		pj->jsonString		= (const uint8_t*)jsonString;
+		pj->jsonStringEnd	= (const uint8_t*)jsonString + jsonStringByteCount;
+		pj->cursor		= (const uint8_t*)jsonString;
+
+		if (!jsonString || jsonStringByteCount < 2) {
+			GiveUp(pj->env, BON_STATUS_INVALID_JSON_TEXT);
 		}
 
-		pj->cursor += 3; /* Skip parsing BOM */
-	}
+		/* http://www.ietf.org/rfc/rfc4627.txt, section 3. Encoding
+		 * http://en.wikipedia.org/wiki/Byte_order_mark, 
+		 * Verify that string is UTF8 by checking for nulls in the first two bytes and also for non UTF8 BOMs*/
+		if (jsonString[0] == 0 || jsonString[1] == 0 || jsonString[0] == 0xFEu || jsonString[0] == 0xFFu) {
+			GiveUp(pj->env, BON_STATUS_JSON_NOT_UTF8);
+		}
 
-	SkipWhitespace(pj);
-	ParseObjectOrArray(pj);
-	SkipWhitespace(pj);
+		/* Skip three byte UTF-8 BOM if there is one */
+		if (jsonString[0] == 0xEFu) {
+			if (jsonStringByteCount < 3 || jsonString[1] != 0xBBu || jsonString[2] != 0xBFu) {
+				GiveUp(pj->env, BON_STATUS_INVALID_JSON_TEXT);
+			}
 
-	if (pj->cursor != pj->jsonStringEnd) {
-		SetStatusCode(ctx, BON_STATUS_JSON_PARSE_ERROR);
-		goto done;
+			pj->cursor += 3; /* Skip parsing BOM */
+		}
+
+		SkipWhitespace(pj);
+		ParseObjectOrArray(pj);
+		SkipWhitespace(pj);
+
+		if (pj->cursor != pj->jsonStringEnd) {
+			GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
+		}
+	} else {
+		if (pj) {
+			pj->status = status;
+		}
 	}
-done:
 	return pj;
 }
 
+int				
+BonGetParsedJsonStatus(struct BonParsedJson* parsedJson) {
+	if (parsedJson) {
+		return parsedJson->status;
+	} else {
+		return BON_STATUS_OUT_OF_MEMORY;
+	}
+}
+
 size_t				
-BonGetBonRecordSize(BonContext* ctx, struct BonParsedJson* parsedJson) {
-	assert(ctx);
+BonGetBonRecordSize(struct BonParsedJson* parsedJson) {
+	assert(parsedJson->status == BON_STATUS_OK);
 	return parsedJson->bonRecordSize;
 }
 
 const BonRecord*		
-BonCreateRecordFromParsedJson(BonContext* ctx, struct BonParsedJson* parsedJson, void* recordMemory) {
-	assert(ctx);
+BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory) {
+	assert(parsedJson->status == BON_STATUS_OK);
 	return 0;
 }
 
+static void
+FreeString(BonStringEntry* v) {
+	if (!v)
+		return;
+	free(v);
+}
+
+static void 
+FreeVariant(BonVariant* v) {
+	switch (v->type) {
+	case BON_VT_OBJECT: {
+		BonObjectEntry* head	= v->value.objectValue;
+		BonObjectEntry* p;
+		if (!head)
+			return;
+		p = head->next;
+		while (p != head) {
+			BonObjectEntry* next = p->next;
+			FreeString(p->name);
+			FreeVariant(&p->value);
+			free(p);
+			p = next;
+		}
+		free(head);
+		break;
+	}
+	case BON_VT_ARRAY: {
+		BonArrayEntry* head = v->value.arrayValue;
+		BonArrayEntry* p;
+		if (!head)
+			return;
+		p = head->next;
+		while (p != head) {
+			BonArrayEntry* next = p->next;
+			FreeVariant(&p->value);
+			free(p);
+			p = next;
+		}
+		free(head);
+		break;
+	}
+	case BON_VT_STRING: {
+		FreeString(v->value.stringValue);
+		break;
+	}
+
+	}
+}
+
+static void 
+FreeParsedJson(BonParsedJson* parsedJson) {
+	if (parsedJson) {
+		FreeVariant(&parsedJson->rootValue);
+		free(parsedJson);
+	}
+}
+
 const BonRecord*		
-BonCreateRecordFromJson(BonContext* ctx, const char* jsonString, size_t jsonStringByteCount) {
-	BonParsedJson*		parsedJson	= BonParseJson(ctx, malloc, jsonString, jsonStringByteCount);
-	const BonRecord*	bonRecord	= BonCreateRecordFromParsedJson(ctx, parsedJson, malloc(BonGetBonRecordSize(ctx, parsedJson)));
+BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
+	BonParsedJson*		parsedJson	= BonParseJson(malloc, jsonString, jsonStringByteCount);
+	const BonRecord*	bonRecord	= BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
+
+	FreeParsedJson(parsedJson);
 
 	assert(0);
-	/* Free all memory allocated for parsedJson */
 	return bonRecord;
 }
 
 /*---------------------------------------------------------------------------*/
 /* :Testing */
 
-char s0[] = "   {  \"apa\" : false   } ";
+/* Tests starting with + are expected to succeed and those that start with - are expected to fail */
+static const char s_tests[] =
+	"+   {  \"apa\" : false, \"Skill\":null }  \0"
+	"+[]\0"
+	"+[false,true,null,false,\"apa\",{},[]]\0"
+	"+[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,null]]\0"
+	"-[\0"
+	"-\0"
+	"-[ \"abc ]\0"
+	"-[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,nul]]\0"
+	"\0"; /* Terminate tests */
 
 int 
 main(int argc, char** argv) {
-	BonContext ctx[1];
-	BonParsedJson* parsedJson;
-	
-	BonInitContext(ctx);
-	parsedJson = BonParseJson(ctx, malloc, s0, sizeof(s0) - 1);
-	assert(BonGetAndClearStatus(ctx) == BON_STATUS_OK);
+	const char* test = s_tests;
+	while(*test) {
+		int expectedResult		= (*test++ == '+') ? BON_TRUE : BON_FALSE;
+		size_t len			= strlen(test);
+		BonParsedJson* parsedJson	= BonParseJson(malloc, test, len);
+		if (!parsedJson) {
+			if (expectedResult == BON_TRUE) {
+				printf("FAIL (-): %s\n", test);
+			}
+		} else {
+			if ((parsedJson->status == BON_STATUS_OK) != expectedResult) {
+				printf("FAIL (%d): %s\n", parsedJson->status, test);
+			}
+		}
+		FreeParsedJson(parsedJson);
+		test += len + 1;
+	}
 
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
+
+#pragma warning(pop)
