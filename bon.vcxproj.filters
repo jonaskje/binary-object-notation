@@ -18,9 +18,21 @@
     <ClCompile Include="Bon.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Beon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BonConvert.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Beon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BonConvert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

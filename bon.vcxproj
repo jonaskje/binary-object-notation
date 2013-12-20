@@ -19,10 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Beon.c" />
     <ClCompile Include="Bon.c" />
+    <ClCompile Include="BonConvert.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Beon.h" />
     <ClInclude Include="Bon.h" />
+    <ClInclude Include="BonConvert.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8A2D9264-9FCB-483E-8D38-466A9F508F2F}</ProjectGuid>
