@@ -2,6 +2,13 @@
 
 #include "Bon.h"
 
+#define BON_STATUS_OK			0
+#define BON_STATUS_INVALID_JSON_TEXT	1
+#define BON_STATUS_JSON_PARSE_ERROR	2
+#define BON_STATUS_JSON_NOT_UTF8	3
+#define BON_STATUS_OUT_OF_MEMORY	4
+#define BON_STATUS_INVALID_NUMBER	5
+
 /* Must return a memory block with alignment suitable for storing a pointer */
 typedef void* (*BonTempMemoryAllocator)(size_t byteCount);
 

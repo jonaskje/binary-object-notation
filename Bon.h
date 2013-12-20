@@ -41,13 +41,6 @@ typedef struct BonArray {
 #define BON_FALSE		0
 #define BON_TRUE		1
 
-#define BON_STATUS_OK			0
-#define BON_STATUS_INVALID_JSON_TEXT	1
-#define BON_STATUS_JSON_PARSE_ERROR	2
-#define BON_STATUS_JSON_NOT_UTF8	3
-#define BON_STATUS_OUT_OF_MEMORY	4
-
-
 /* Reading */
 
 BonBool				BonIsAValidRecord(BonRecord* br, size_t sizeBytes);
@@ -64,5 +57,7 @@ const char*			BonAsString(const BonValue* bv);
 BonBool				BonAsBool(const BonValue* bv);
 
 const double*			BonAsNumberArray(const BonArray* ba);
+
+BonName				BonCreateName(const char* nameString, size_t nameStringByteCount);
 
 #pragma warning(pop)
