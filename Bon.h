@@ -14,10 +14,12 @@ typedef uint32_t		BonName;
 typedef int			BonBool;
 
 typedef struct BonRecord {
-	uint16_t		magic;
+	uint32_t		magic;
 	uint8_t			version;
 	uint8_t			flags;
-	BonValue		nameHashObject;		/* A nameString to nameHash lookup dictionary */
+	uint16_t		reserved0;
+	uint32_t		reserved1;
+	int32_t			nameLookupTableOffset;		
 } BonRecord;
 
 typedef struct BonObject {

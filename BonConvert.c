@@ -1,8 +1,8 @@
 #include "BonConvert.h"
 
 #pragma warning(push)
-#pragma warning(disable : 4001)	/* Single line comments */
-#pragma warning(disable : 4820) /* N bytes padding added after data member X */
+#pragma warning(disable : 4001)							/* Single line comments */
+#pragma warning(disable : 4820)							/* N bytes padding added after data member X */
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <assert.h>
@@ -14,9 +14,9 @@
 #pragma warning(pop)
 
 #pragma warning(push)
-#pragma warning(disable : 4127)	/* Conditional expression is constant */
-#pragma warning(disable : 4820) /* N bytes padding added after data member X */
-#pragma warning(disable : 4100) /* Unreferenced formal parameter */
+#pragma warning(disable : 4127)							/* Conditional expression is constant */
+#pragma warning(disable : 4820)							/* N bytes padding added after data member X */
+#pragma warning(disable : 4100)							/* Unreferenced formal parameter */
 
 /*---------------------------------------------------------------------------*/
 /* List helpers */
@@ -53,57 +53,57 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
 */
-#define BonSortList(head, ElementType, CompareFun) \
-	do {	                                                                               \
-		ElementType *p, *q, *e, *tail, *oldhead, *list;				       \
-		int insize, nmerges, psize, qsize, i;					       \
-		list = *(head);								       \
-		if (!list) break;							       \
-		insize = 1;								       \
-		for (;;) {								       \
-			p = oldhead = list;						       \
-			list = tail = 0;						       \
-			nmerges = 0;							       \
-			while (p) {							       \
-				nmerges++;						       \
-				q = p;							       \
-				psize = 0;						       \
-				for (i = 0; i < insize; i++) {				       \
-					psize++;					       \
-					q = q->next;					       \
-					if (!q) break;					       \
-				}							       \
-				qsize = insize;						       \
-				while (psize > 0 || (qsize > 0 && q)) {			       \
-					if (psize == 0) {				       \
-						e = q; q = q->next; qsize--;		       \
-					}						       \
-					else if (qsize == 0 || !q) {			       \
-						e = p; p = p->next; psize--;		       \
-					}						       \
-					else if (CompareFun(p, q) <= 0) {		       \
-						e = p; p = p->next; psize--;		       \
-					}						       \
-					else {						       \
-						e = q; q = q->next; qsize--;		       \
-					}						       \
-					if (tail) {					       \
-						tail->next = e;				       \
-					}						       \
-					else {						       \
-						list = e;				       \
-					}						       \
-					tail = e;					       \
-				}							       \
-				p = q;							       \
-			}								       \
-			tail->next = NULL;						       \
-			if (nmerges <= 1) {						       \
-				*(head) = list;						       \
-				break;							       \
-			}								       \
-			insize *= 2;                                                           \
-		}									       \
+#define BonSortList(head, ElementType, CompareFun)				\
+	do {	                                                                \
+		ElementType *p, *q, *e, *tail, *oldhead, *list;			\
+		int insize, nmerges, psize, qsize, i;				\
+		list = *(head);							\
+		if (!list) break;						\
+		insize = 1;							\
+		for (;;) {							\
+			p = oldhead = list;					\
+			list = tail = 0;					\
+			nmerges = 0;						\
+			while (p) {						\
+				nmerges++;					\
+				q = p;						\
+				psize = 0;					\
+				for (i = 0; i < insize; i++) {			\
+					psize++;				\
+					q = q->next;				\
+					if (!q) break;				\
+				}						\
+				qsize = insize;					\
+				while (psize > 0 || (qsize > 0 && q)) {		\
+					if (psize == 0) {			\
+						e = q; q = q->next; qsize--;	\
+					}					\
+					else if (qsize == 0 || !q) {		\
+						e = p; p = p->next; psize--;	\
+					}					\
+					else if (CompareFun(p, q) <= 0) {	\
+						e = p; p = p->next; psize--;	\
+					}					\
+					else {					\
+						e = q; q = q->next; qsize--;	\
+					}					\
+					if (tail) {				\
+						tail->next = e;			\
+					}					\
+					else {					\
+						list = e;			\
+					}					\
+					tail = e;				\
+				}						\
+				p = q;						\
+			}							\
+			tail->next = NULL;					\
+			if (nmerges <= 1) {					\
+				*(head) = list;					\
+				break;						\
+			}							\
+			insize *= 2;                                            \
+		}								\
 	} while(0)
 
 /*---------------------------------------------------------------------------*/
@@ -115,18 +115,41 @@ struct BonArrayEntry;
 typedef struct BonStringEntry {
 	struct BonStringEntry*	next;
 	struct BonStringEntry*	alias;
+	size_t			offset;
 	size_t			byteCount;
 	BonName			hash;
 	uint8_t			utf8[1];
 } BonStringEntry;
 
+typedef struct BonContainer {
+	struct BonContainer*	next;
+	int			type;
+} BonContainer;
+
+typedef struct BonArrayHead {
+	BonContainer		container;
+	size_t			offset;
+	size_t			size;
+	struct BonArrayEntry*	valueList;
+	struct BonArrayEntry**	lastValue;
+} BonArrayHead;
+
+typedef struct BonObjectHead {
+	BonContainer		container;
+	size_t			offset;
+	size_t			size;
+	size_t			memberCount;
+	struct BonObjectEntry*	memberList;
+} BonObjectHead;
+
 typedef struct BonVariant {
 	union {
 		BonBool			boolValue;
 		double			numberValue;
-		struct BonObjectEntry*	objectValue;
-		struct BonArrayEntry*	arrayValue;
+		struct BonObjectHead*	objectValue;
+		struct BonArrayHead*	arrayValue;
 		BonStringEntry*		stringValue;
+		BonValue		value;
 	} value;
 	int			type;
 } BonVariant;
@@ -154,17 +177,36 @@ typedef struct BonParsedJson {
 
 	BonStringEntry*		nameStringList;
 	BonStringEntry*		valueStringList;
-	int			objectCount;
-	int			objectMemberCount;
-	int			objectMemberNameCount;
-	int			arrayCount;
-	int			arrayMemberCount;
+	BonContainer*		containerList;
+	BonContainer**		lastContainer;
+
+	size_t			totalObjectSize;
+	size_t			totalArraySize;
+	size_t			totalValueStringSize;
+	size_t			totalNameLookupSize;
+	size_t			totalNameStringSize;
+
+	size_t			totalNameStringCount;
+
+	size_t			objectOffset;
+	size_t			arrayOffset;
+	size_t			valueStringOffset;
+	size_t			nameLookupOffset;
+	size_t			nameStringOffset;
+
+	void*			recordBaseMemory;
 
 	/* Results */
 	int			status;
 	size_t			bonRecordSize;
 	BonVariant		rootValue;
 } BonParsedJson;
+
+typedef struct BonContainerInternal {
+	int32_t		capacity;	/* Negative for objects and positive for arrays */
+	int32_t		count;
+	BonValue	items[1];
+} BonContainerInternal;
 
 static size_t 
 BonRoundUp(size_t value, size_t multiple) {
@@ -192,6 +234,8 @@ DoTempCalloc(BonTempMemoryAllocator alloc, jmp_buf* exceptionEnv, size_t size) {
 	return memset(result, 0, size);
 }
 
+#define BonFourCC(a,b,c,d)		((uint32_t) (((d)<<24) | ((c)<<16) | ((b)<<8) | (a)))
+
 #define BonTempCalloc(tempAllocator, exceptionEnv, type) ((type*)DoTempCalloc(tempAllocator, exceptionEnv, sizeof(type)))
 
 static BonObjectEntry*
@@ -204,18 +248,23 @@ CreateArrayEntry(BonParsedJson* pj) {
 	return BonTempCalloc(pj->alloc, pj->env, BonArrayEntry);
 }
 
-static BonObjectEntry**
+static BonObjectHead*
 InitObjectVariant(BonParsedJson* pj, BonVariant* v) {
+	BonObjectHead* head = BonTempCalloc(pj->alloc, pj->env, BonObjectHead);
+	head->container.type = BON_VT_OBJECT;
 	v->type = BON_VT_OBJECT;
-	v->value.objectValue = 0;
-	return &v->value.objectValue;
+	v->value.objectValue = head;
+	return head;
 }
 
-static BonArrayEntry**
+static BonArrayHead*
 InitArrayVariant(BonParsedJson* pj, BonVariant* v) {
+	BonArrayHead* head = BonTempCalloc(pj->alloc, pj->env, BonArrayHead);
+	head->lastValue = &head->valueList;
+	head->container.type = BON_VT_ARRAY;
 	v->type = BON_VT_ARRAY;
-	v->value.arrayValue = 0;
-	return &v->value.arrayValue;
+	v->value.arrayValue = head;
+	return head;
 }
 
 static void
@@ -282,8 +331,8 @@ ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 	}
 
 	stringBufferSize =
-		+(stringEnd - string)		/* Min length of string in bytes */
-		+ 1;				/* Space for a terminating null */
+		+(stringEnd - string)						/* Min length of string in bytes */
+		+ 1;								/* Space for a terminating null */
 
 	bufferSize = offsetof(BonStringEntry, utf8) + stringBufferSize;
 
@@ -311,28 +360,28 @@ ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 
 			c2 = *string++;
 			switch (c2) {
-			case 0x22u: /* \" */
-			case 0x5Cu: /* \\ */
-			case 0x2Fu: /* \/ */
+			case 0x22u:						/* \" */
+			case 0x5Cu:						/* \\ */
+			case 0x2Fu:						/* \/ */
 				*dstString++ = c2;
 				break;
-			case 0x62u: /* \b */
+			case 0x62u:						/* \b */
 				*dstString++ = +0x08u;
 				break;
-			case 0x66u: /* \f */
+			case 0x66u:						/* \f */
 				*dstString++ = +0x0Cu;
 				break;
-			case 0x6Eu: /* \n */
+			case 0x6Eu:						/* \n */
 				*dstString++ = +0x0Au;
 				break;
-			case 0x72u: /* \r */
+			case 0x72u:						/* \r */
 				*dstString++ = +0x0Du;
 				break;
-			case 0x74u: /* \t */
+			case 0x74u:						/* \t */
 				*dstString++ = +0x09u;
 				break;
-			case 0x75u: /* \u */
-				assert(0); /* TODO: Unicode escape */
+			case 0x75u:						/* \u */
+				assert(0);					/* TODO: Unicode escape */
 				break;
 			}
 		}
@@ -351,8 +400,8 @@ ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 }
 
 static void			ParseValue(BonParsedJson* pj, BonVariant* value);
-static void			ParseObject(BonParsedJson* pj, BonObjectEntry** objectHead);
-static void			ParseArray(BonParsedJson* pj, BonArrayEntry** arrayHead);
+static void			ParseObject(BonParsedJson* pj, BonObjectHead* objectHead);
+static void			ParseArray(BonParsedJson* pj, BonArrayHead* arrayHead);
 
 static BonVariant		s_nullVariant		= { BON_VT_NULL, 0 };
 static BonVariant		s_boolFalseVariant	= { BON_VT_BOOL, BON_FALSE };
@@ -373,19 +422,16 @@ ObjectNameCompare(const BonObjectEntry* a, const BonObjectEntry* b) {
 }
 
 static void
-ParseObject(BonParsedJson* pj, BonObjectEntry** objectHead) {
+ParseObject(BonParsedJson* pj, BonObjectHead* objectHead) {
 	int memberCount = 0;
 	FailIfEof(pj);
 	FailUnlessCharIs(pj, '{');
-	
-	pj->objectCount++;
-	
 	SkipWhitespace(pj);
 	if (PeekChar(pj, '}')) {
 		goto done;
 	}
 	for(;;) {
-		BonObjectEntry* member = AppendObjectMember(pj, objectHead);
+		BonObjectEntry* member = AppendObjectMember(pj, &objectHead->memberList);
 		memberCount++;
 		ParseString(pj, &member->name);
 		BonPrependToList(&pj->nameStringList, member->name);
@@ -399,30 +445,31 @@ ParseObject(BonParsedJson* pj, BonObjectEntry** objectHead) {
 		FailUnlessCharIs(pj, ',');
 		SkipWhitespace(pj);
 	}
-	pj->objectMemberCount += memberCount;
-	pj->objectMemberNameCount += (int)BonRoundUp(memberCount, 2);	/* Account for round up when odd number of members */
 
 	/* Canonicalize */
-	BonSortList(objectHead, BonObjectEntry, ObjectNameCompare);
+	BonSortList(&objectHead->memberList, BonObjectEntry, ObjectNameCompare);
 done:
 	FailUnlessCharIs(pj, '}');
+	objectHead->size = 8;							/* Size of the object header */
+	objectHead->size += memberCount * sizeof(BonValue);
+	objectHead->size += BonRoundUp(memberCount, 2) * sizeof(BonName);	/* Account for round up when odd number of members */
+	objectHead->memberCount = memberCount;
 }
 
 static BonArrayEntry*
-AppendArrayMember(BonParsedJson* pj, BonArrayEntry** arrayHead) {
+AppendArrayMember(BonParsedJson* pj, BonArrayHead* arrayHead) {
 	BonArrayEntry* member = CreateArrayEntry(pj);
 	member->value = s_nullVariant;
-	BonPrependToList(arrayHead, member); /* Note: reverse order */
+	*arrayHead->lastValue = member;
+	arrayHead->lastValue = &member->next;
 	return member;
 }
 
 static void
-ParseArray(BonParsedJson* pj, BonArrayEntry** arrayHead) {
+ParseArray(BonParsedJson* pj, BonArrayHead* arrayHead) {
+	int memberCount = 0;
 	FailIfEof(pj);
 	FailUnlessCharIs(pj, '[');
-
-	pj->arrayCount++;
-
 	SkipWhitespace(pj);
 	if (PeekChar(pj, ']')) {
 		goto done;
@@ -430,7 +477,7 @@ ParseArray(BonParsedJson* pj, BonArrayEntry** arrayHead) {
 	for (;;) {
 		BonArrayEntry* member = AppendArrayMember(pj, arrayHead);
 
-		pj->arrayMemberCount++;
+		memberCount++;
 
 		ParseValue(pj, &member->value);
 		SkipWhitespace(pj);
@@ -441,6 +488,8 @@ ParseArray(BonParsedJson* pj, BonArrayEntry** arrayHead) {
 	}
 done:
 	FailUnlessCharIs(pj, ']');
+	arrayHead->size = 8;							/* Size of the array header */
+	arrayHead->size += memberCount * sizeof(BonValue);
 }
 
 static void
@@ -510,14 +559,15 @@ ParseStringValue(BonParsedJson* pj, BonVariant* value) {
  * software for any purpose.  It is provided "as is" without
  * express or implied warranty.
  */
-static int maxExponent = 511;	/* Largest possible base 10 exponent.  Any
-				 * exponent larger than this will already
-				 * produce underflow or overflow, so there's
-				 * no need to worry about additional digits.
-				 */
-static double powersOf10[] = {	/* Table giving binary powers of 10.  Entry */
-	10.,			/* is 10^2^i.  Used to convert decimal */
-	100.,			/* exponents into floating-point numbers. */
+static int maxExponent = 511;							/* Largest possible base 10 exponent.  Any
+										 * exponent larger than this will already
+										 * produce underflow or overflow, so there's
+										 * no need to worry about additional digits.
+										 */
+
+static double powersOf10[] = {							/* Table giving binary powers of 10.  Entry */
+	10.,									/* is 10^2^i.  Used to convert decimal */
+	100.,									/* exponents into floating-point numbers. */
 	1.0e4,
 	1.0e8,
 	1.0e16,
@@ -533,22 +583,22 @@ StringToDouble(const char* string, size_t n, const char** endPtr) {
 	double fraction, dblExp, *d;
 	register const char *p;
 	register int c;
-	int exp = 0;		/* Exponent read from "EX" field. */
-	int fracExp = 0;	/* Exponent that derives from the fractional
-				 * part.  Under normal circumstances, it is
-				 * the negative of the number of digits in F.
-				 * However, if I is very long, the last digits
-				 * of I get dropped (otherwise a long I with a
-				 * large negative exponent could cause an
-				 * unnecessary overflow on I alone).  In this
-				 * case, fracExp is incremented one for each
-				 * dropped digit. */
-	int mantSize;		/* Number of digits in mantissa. */
-	int decPt;		/* Number of mantissa digits BEFORE decimal
-				 * point. */
-	const char *pExp;	/* Temporarily holds location of exponent
-				 * in string. */
-	const char *pEnd;	/* Max position of p */
+	int exp = 0;								/* Exponent read from "EX" field. */
+	int fracExp = 0;							/* Exponent that derives from the fractional
+										 * part.  Under normal circumstances, it is
+										 * the negative of the number of digits in F.
+										 * However, if I is very long, the last digits
+										 * of I get dropped (otherwise a long I with a
+										 * large negative exponent could cause an
+										 * unnecessary overflow on I alone).  In this
+										 * case, fracExp is incremented one for each
+										 * dropped digit. */
+	int mantSize;								/* Number of digits in mantissa. */
+	int decPt;								/* Number of mantissa digits BEFORE decimal
+										 * point. */
+	const char *pExp;							/* Temporarily holds location of exponent
+										 * in string. */
+	const char *pEnd;							/* Max position of p */
 
 	p = string;
 	pEnd = string + n;
@@ -597,7 +647,7 @@ StringToDouble(const char* string, size_t n, const char** endPtr) {
 		decPt = mantSize;
 	}
 	else {
-		mantSize -= 1;			/* One of the digits was the point. */
+		mantSize -= 1;							/* One of the digits was the point. */
 	}
 	if (mantSize > 18) {
 		fracExp = decPt - 18;
@@ -769,10 +819,13 @@ NameCompare(const BonStringEntry* a, const BonStringEntry* b) {
 	return (int)((int64_t)(uint64_t)(a->hash) - (int64_t)(uint64_t)(b->hash));
 }
 
-static void
-LinkAliasesInSortedList(BonStringEntry* head) {
-	BonStringEntry* p = head;
-	BonStringEntry* ptop = p;
+static size_t
+ComputeOffsetAndLinkAliasesInSortedList(size_t* stringCount, BonStringEntry* head) {
+	size_t			totalSize	= 0;
+	size_t			count		= 0;
+	BonStringEntry*		p		= head;
+	BonStringEntry*		ptop		= p;
+
 	while(p) {
 		/* TODO: Should check for conflicts here */
 		if (p->hash == ptop->hash) {
@@ -780,54 +833,85 @@ LinkAliasesInSortedList(BonStringEntry* head) {
 		} else {
 			ptop = p;
 		}
-		p = p->next;
-	}
-}
-
-static size_t
-ComputeStorageForUniqueStrings(BonStringEntry* head) {
-	size_t size = 0;
-	BonStringEntry* p = head;
-	while (p) {
-		if (p->alias == p) {
-			size += BonRoundUp(p->byteCount + 1, 8);
+		if (p == p->alias) {
+			p->offset = totalSize;
+			totalSize += BonRoundUp(p->byteCount + 1, 8);
+			++count;
 		}
 		p = p->next;
 	}
-	return size;
+	if (stringCount) {
+		*stringCount = count; 
+	}	
+	return totalSize;
 }
 
 static size_t
 ComputeStorageSizeForRecord(BonParsedJson* pj) {
 	size_t size = 0;
-	const size_t objectHeaderSize = 8;
-	const size_t arrayHeaderSize = 8;
-	
-	/* Header */
 	size += BonRoundUp(sizeof(BonRecord), 8);
 
-	/* Objects */
-	size += objectHeaderSize * pj->objectCount + sizeof(BonVariant) * pj->objectMemberCount + sizeof(BonName) * pj->objectMemberNameCount;
+	pj->objectOffset = size;
+	size += pj->totalObjectSize;
 
-	/* Arrays */
-	size += arrayHeaderSize * pj->arrayCount + sizeof(BonVariant)* pj->arrayMemberCount;
+	pj->arrayOffset = size;
+	size += pj->totalArraySize;
 
-	/* String values */
-	LinkAliasesInSortedList(pj->valueStringList);
-	size += ComputeStorageForUniqueStrings(pj->valueStringList);
+	pj->valueStringOffset = size;
+	size += pj->totalValueStringSize;
 
-	/* Names */
-	LinkAliasesInSortedList(pj->nameStringList);
-	size += ComputeStorageForUniqueStrings(pj->nameStringList);
+	pj->nameLookupOffset = size;
+	size += pj->totalNameLookupSize;
+
+	pj->nameStringOffset = size;
+	size += pj->totalNameStringSize;
 
 	return size;
 }
 
-/* Sort the parsedJson into a canonical form */
 static void
-CanonicalizeParsedJson(BonParsedJson* pj) {
-	BonSortList(&pj->nameStringList, BonStringEntry, NameCompare);
-	BonSortList(&pj->valueStringList, BonStringEntry, NameCompare);
+ComputeVariantOffsets(BonParsedJson* pj) {
+	/* Exploit fact that both arrayValue and objectValue has a BonContainer as the first member */
+	BonContainer*		rootContainer	= &(pj->rootValue.value.objectValue->container);
+	BonContainer*		p		= rootContainer;
+	size_t			totalObjectSize = 0;
+	size_t			totalArraySize	= 0;
+
+	*pj->lastContainer = rootContainer;
+	assert(rootContainer->next == 0);
+	pj->lastContainer = &(rootContainer->next);
+
+	for (; p; p = p->next) {
+		if (p->type == BON_VT_OBJECT) {
+			BonObjectHead* head = (BonObjectHead*)p;
+			BonObjectEntry* entry;
+			head->offset = totalObjectSize;
+			totalObjectSize += head->size;
+			for (entry = head->memberList; entry; entry = entry->next) {
+				if (entry->value.type == BON_VT_OBJECT || entry->value.type == BON_VT_ARRAY) {
+					BonContainer* entryContainer = &entry->value.value.objectValue->container;
+					*pj->lastContainer = entryContainer;
+					pj->lastContainer = &(entryContainer->next);
+				}
+			}
+		} else {
+			BonArrayHead* head = (BonArrayHead*)p;
+			BonArrayEntry* entry;
+			assert(p->type == BON_VT_ARRAY);
+			head->offset = totalArraySize;
+			totalArraySize += head->size;
+			for (entry = head->valueList; entry; entry = entry->next) {
+				if (entry->value.type == BON_VT_OBJECT || entry->value.type == BON_VT_ARRAY) {
+					BonContainer* entryContainer = &entry->value.value.objectValue->container;
+					*pj->lastContainer = entryContainer;
+					pj->lastContainer = &(entryContainer->next);
+				}
+			}
+		}
+	}
+
+	pj->totalObjectSize	= totalObjectSize;
+	pj->totalArraySize	= totalArraySize;
 }
 
 BonParsedJson*
@@ -851,6 +935,7 @@ BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_
 		pj->jsonString		= (const uint8_t*)jsonString;
 		pj->jsonStringEnd	= (const uint8_t*)jsonString + jsonStringByteCount;
 		pj->cursor		= (const uint8_t*)jsonString;
+		pj->lastContainer	= &pj->containerList;
 
 		if (!jsonString || jsonStringByteCount < 2) {
 			GiveUp(pj->env, BON_STATUS_INVALID_JSON_TEXT);
@@ -869,7 +954,7 @@ BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_
 				GiveUp(pj->env, BON_STATUS_INVALID_JSON_TEXT);
 			}
 
-			pj->cursor += 3; /* Skip parsing BOM */
+			pj->cursor += 3;					/* Skip parsing BOM */
 		}
 
 		SkipWhitespace(pj);
@@ -880,7 +965,17 @@ BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_
 			GiveUp(pj->env, BON_STATUS_JSON_PARSE_ERROR);
 		}
 
-		CanonicalizeParsedJson(pj);
+		/* Sort the strings by hash into a canonical form */
+		BonSortList(&pj->nameStringList, BonStringEntry, NameCompare);
+		pj->totalNameStringSize = ComputeOffsetAndLinkAliasesInSortedList(&pj->totalNameStringCount, pj->nameStringList);
+		pj->totalNameLookupSize = 8;
+		pj->totalNameLookupSize += pj->totalNameStringCount * (sizeof(BonName) + sizeof(uint32_t)); /* Name, offset pair */
+
+		BonSortList(&pj->valueStringList, BonStringEntry, NameCompare);
+		pj->totalValueStringSize = ComputeOffsetAndLinkAliasesInSortedList(0, pj->valueStringList);
+
+		ComputeVariantOffsets(pj);
+
 		pj->bonRecordSize = ComputeStorageSizeForRecord(pj);
 	} else {
 		if (pj) {
@@ -905,10 +1000,145 @@ BonGetBonRecordSize(struct BonParsedJson* parsedJson) {
 	return parsedJson->bonRecordSize;
 }
 
+static ptrdiff_t 
+RelativeOffset(void* from, void* basePtr, size_t offsetFromBase) {
+	return ((uint8_t*)basePtr + offsetFromBase) - (uint8_t*)from;
+}
+
+static BonValue
+MakeObjectValue(ptrdiff_t relativeOffset) {
+	assert((relativeOffset & 0x7ll) == 0);
+	return (BonValue)relativeOffset | (BonValue)BON_VT_OBJECT;
+}
+
+static BonValue
+MakeArrayValue(ptrdiff_t relativeOffset) {
+	assert((relativeOffset & 0x7ll) == 0);
+	return (BonValue)relativeOffset | (BonValue)BON_VT_ARRAY;
+}
+
+static BonValue
+MakeStringValue(ptrdiff_t relativeOffset) {
+	assert((relativeOffset & 0x7ll) == 0);
+	return (BonValue)relativeOffset | (BonValue)BON_VT_STRING;
+}
+
+static BonValue
+MakeBoolValue(int v) {
+	return ((BonValue)v << 32) | (BonValue)BON_VT_BOOL;
+}
+
+static BonValue
+MakeNullValue(void) {
+	return (BonValue)0x7ull;
+}
+
+static BonValue
+MakeValueFromVariant(BonParsedJson* pj, BonValue* value, BonVariant* v) {
+	switch (v->type) {
+	case BON_VT_NUMBER:	return v->value.value;	/* Effectively cast double to BonValue */
+	case BON_VT_BOOL:	return MakeBoolValue(v->value.boolValue);
+	case BON_VT_STRING:	return MakeStringValue(RelativeOffset(value, pj->recordBaseMemory, pj->valueStringOffset + v->value.stringValue->alias->offset));
+	case BON_VT_ARRAY:	return MakeArrayValue(RelativeOffset(value, pj->recordBaseMemory, pj->arrayOffset + v->value.arrayValue->offset));
+	case BON_VT_OBJECT:	return MakeObjectValue(RelativeOffset(value, pj->recordBaseMemory, pj->objectOffset + v->value.objectValue->offset));
+	case BON_VT_NULL:	return MakeNullValue();
+	default: assert(0);	return 0;
+	}
+}
+
+
 const BonRecord*		
-BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory) {
-	assert(parsedJson->status == BON_STATUS_OK);
-	return 0;
+BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
+	/* Exploit fact that both arrayValue and objectValue has a BonContainer as the first member */
+	BonContainer*		p		= pj->containerList;
+	BonRecord*		header		= (BonRecord*)recordMemory;
+	uint8_t*		baseMemory	= (uint8_t*)recordMemory;
+	BonStringEntry*		stringEntry	= 0;
+	uint32_t*		nameLookupCursor= (uint32_t*)(baseMemory + pj->nameLookupOffset);
+
+	assert(pj->status == BON_STATUS_OK);
+
+	pj->recordBaseMemory = recordMemory;
+
+	/* Header */
+	header->magic			= BonFourCC('B', 'O', 'N', ' ');
+	header->flags			= 0;
+	header->reserved0		= 0;
+	header->reserved1		= 0;
+	header->version			= 0;
+	header->nameLookupTableOffset	= (int32_t)RelativeOffset(&header->nameLookupTableOffset, baseMemory, pj->nameLookupOffset);
+
+	/* Containers and arrays */
+	for (; p; p = p->next) {
+		if (p->type == BON_VT_OBJECT) {
+			BonObjectHead*		head	= (BonObjectHead*)p;
+			BonContainerInternal*	dst	= (BonContainerInternal*)(baseMemory + head->offset + pj->objectOffset);
+			BonName*		name	= (BonName*)(&(dst->items[head->memberCount]));
+			BonValue*		item	= &(dst->items[0]);
+			BonObjectEntry*		entry;
+
+			dst->count	= (int32_t)head->memberCount;
+			dst->capacity	= -dst->count;
+			for (entry = head->memberList; entry; entry = entry->next) {
+				*name++ = entry->name->hash;
+				*item++ = MakeValueFromVariant(pj, item, &entry->value);
+			}
+			if (dst->count % 2) {
+				*name++ = 0;					/* Clear the odd name slot (everything is 8 byte aligned) */
+			}
+		}
+		else {
+			BonArrayHead*		head = (BonArrayHead*)p;
+			BonContainerInternal*	dst = (BonContainerInternal*)(baseMemory + head->offset + pj->arrayOffset);
+			BonValue*		item = &(dst->items[0]);
+			BonArrayEntry*		entry;
+			assert(p->type == BON_VT_ARRAY);
+			dst->count	= (int32_t)((head->size - 8) / sizeof(BonValue));
+			dst->capacity	= dst->count;
+			for (entry = head->valueList; entry; entry = entry->next) {
+				*item++ = MakeValueFromVariant(pj, item, &entry->value);
+			}
+		}
+	}
+
+	/* Value strings */
+	for (stringEntry = pj->valueStringList; stringEntry; stringEntry = stringEntry->next) {
+		uint8_t*	dst;
+		size_t		zeroCount;
+		/* Ignore all with an alias */
+		if (stringEntry->alias != stringEntry) {
+			continue;
+		}
+		dst = baseMemory + pj->valueStringOffset + stringEntry->offset;
+		memcpy(dst, stringEntry->utf8, stringEntry->byteCount);
+		dst += stringEntry->byteCount;
+		zeroCount = BonRoundUp(stringEntry->byteCount, 8) - stringEntry->byteCount;
+		memset(dst, 0, zeroCount);
+	}
+
+	/* Name lookup and name strings*/
+	*nameLookupCursor++ = (uint32_t)pj->totalNameStringCount; /* capacity */
+	*nameLookupCursor++ = (uint32_t)pj->totalNameStringCount; /* count: Same as capacity */
+	for (stringEntry = pj->nameStringList; stringEntry; stringEntry = stringEntry->next) {
+		uint8_t*	dst;
+		size_t		zeroCount;
+		/* Ignore all with an alias */
+		if (stringEntry->alias != stringEntry) {
+			continue;
+		}
+		
+		/* Write a (name hash, offset) pair for each name */
+		*nameLookupCursor++ = stringEntry->hash;
+		*nameLookupCursor++ = (uint32_t)RelativeOffset(nameLookupCursor, baseMemory, pj->nameStringOffset + stringEntry->offset);
+
+		dst = baseMemory + pj->nameStringOffset + stringEntry->offset;
+		memcpy(dst, stringEntry->utf8, stringEntry->byteCount);
+		dst += stringEntry->byteCount;
+		zeroCount = BonRoundUp(stringEntry->byteCount, 8) - stringEntry->byteCount;
+		memset(dst, 0, zeroCount);
+	}
+
+	return header;
 }
 
 static void
@@ -922,7 +1152,12 @@ static void
 FreeVariant(BonVariant* v) {
 	switch (v->type) {
 	case BON_VT_OBJECT: {
-		BonObjectEntry* p = v->value.objectValue;
+		BonObjectHead* head = v->value.objectValue;
+		BonObjectEntry* p;
+		if (!head)
+			break;
+		p = head->memberList;
+		free(head);
 		while (p) {
 			BonObjectEntry* next = p->next;
 			FreeString(p->name);
@@ -933,7 +1168,12 @@ FreeVariant(BonVariant* v) {
 		break;
 	}
 	case BON_VT_ARRAY: {
-		BonArrayEntry* p = v->value.arrayValue;
+		BonArrayHead* head = v->value.arrayValue;
+		BonArrayEntry* p;
+		if (!head)
+			break;
+		p = head->valueList;
+		free(head);
 		while (p) {
 			BonArrayEntry* next = p->next;
 			FreeVariant(&p->value);
@@ -961,11 +1201,16 @@ FreeParsedJson(BonParsedJson* parsedJson) {
 const BonRecord*		
 BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
 	BonParsedJson*		parsedJson	= BonParseJson(malloc, jsonString, jsonStringByteCount);
-	const BonRecord*	bonRecord	= BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
+	const BonRecord*	bonRecord;
 
+	if (parsedJson->status != BON_STATUS_OK) {
+		FreeParsedJson(parsedJson);
+		return 0;
+	}
+
+	bonRecord = BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
 	FreeParsedJson(parsedJson);
 
-	assert(0);
 	return bonRecord;
 }
 
@@ -984,7 +1229,7 @@ static const char s_tests[] =
 	"-25\0"
 	"-[ \"abc ]\0"
 	"-[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,nul]]\0"
-	"\0"; /* Terminate tests */
+	"\0";									/* Terminate tests */
 
 int 
 main(int argc, char** argv) {
@@ -999,29 +1244,42 @@ main(int argc, char** argv) {
 	(void)result;
 	(void)failure;
 	*/
+	ptrdiff_t x  = 	RelativeOffset((void*)32, (void*)24, 0);
+	(void)x;
 
 	assert(BonCreateName("apa", 3) != BonCreateName("foo", 3));
 
 	while(*test) {
 		int expectedResult		= (*test++ == '+') ? BON_TRUE : BON_FALSE;
 		size_t len			= strlen(test);
-		BonParsedJson* parsedJson	= BonParseJson(malloc, test, len);
+
+		/*BonParsedJson* parsedJson	= BonParseJson(malloc, test, len);
 		if (!parsedJson) {
+		*/
+
+		const BonRecord* br = BonCreateRecordFromJson(test, len);
+		if (!br) {
 			if (expectedResult == BON_TRUE) {
 				printf("FAIL (-): %s\n", test);
 			}
 		} else {
+			if (expectedResult == BON_FALSE) {
+				printf("FAIL (-): %s\n", test);
+			}
+			free((void*)br);
+			/*
 			if ((parsedJson->status == BON_STATUS_OK) != expectedResult) {
 				printf("FAIL (%d): %s\n", parsedJson->status, test);
 			} 
 			if ((parsedJson->status == BON_STATUS_OK)) {
 				printf("%d: Size: %lu\n", testNum, (unsigned long)parsedJson->bonRecordSize);
 			}
+			*/
 		}
 
 		testNum++;
 		
-		FreeParsedJson(parsedJson);
+		/*FreeParsedJson(parsedJson);*/
 		test += len + 1;
 	}
 
