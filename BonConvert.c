@@ -1,7 +1,6 @@
 #include "BonConvert.h"
 
 #include <stdlib.h>
-#include <crtdbg.h>
 #include <assert.h>
 #include <string.h>
 #include <stddef.h>
@@ -682,7 +681,7 @@ StringToDouble(const char* string, size_t n, const char** endPtr) {
 	 */
 
 	p = pExp;
-	if ((p != pEnd) && (*p == 'E') || (*p == 'e')) {
+	if ((p != pEnd) && ((*p == 'E') || (*p == 'e'))) {
 		p += 1;
 
 		if (p != pEnd) {
@@ -935,13 +934,13 @@ BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_
 		/* http://www.ietf.org/rfc/rfc4627.txt, section 3. Encoding
 		 * http://en.wikipedia.org/wiki/Byte_order_mark, 
 		 * Verify that string is UTF8 by checking for nulls in the first two bytes and also for non UTF8 BOMs*/
-		if (jsonString[0] == 0 || jsonString[1] == 0 || jsonString[0] == 0xFEu || jsonString[0] == 0xFFu) {
+		if (pj->jsonString[0] == 0 || pj->jsonString[1] == 0 || pj->jsonString[0] == 0xFEu || pj->jsonString[0] == 0xFFu) {
 			GiveUp(pj->env, BON_STATUS_JSON_NOT_UTF8);
 		}
 
 		/* Skip three byte UTF-8 BOM if there is one */
-		if (jsonString[0] == 0xEFu) {
-			if (jsonStringByteCount < 3 || jsonString[1] != 0xBBu || jsonString[2] != 0xBFu) {
+		if (pj->jsonString[0] == 0xEFu) {
+			if (jsonStringByteCount < 3 || pj->jsonString[1] != 0xBBu || pj->jsonString[2] != 0xBFu) {
 				GiveUp(pj->env, BON_STATUS_INVALID_JSON_TEXT);
 			}
 
@@ -1078,7 +1077,8 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 			dst->capacity	= -dst->count;
 			for (entry = head->memberList; entry; entry = entry->next) {
 				*name++ = entry->name->hash;
-				*item++ = MakeValueFromVariant(pj, item, &entry->value);
+				*item = MakeValueFromVariant(pj, item, &entry->value);
+				++item;
 			}
 			if (dst->count % 2) {
 				*name++ = 0;					/* Clear the odd name slot (everything is 8 byte aligned) */
@@ -1093,7 +1093,8 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 			dst->count	= (int32_t)((head->size - 8) / sizeof(BonValue));
 			dst->capacity	= dst->count;
 			for (entry = head->valueList; entry; entry = entry->next) {
-				*item++ = MakeValueFromVariant(pj, item, &entry->value);
+				*item = MakeValueFromVariant(pj, item, &entry->value);
+				++item;
 			}
 		}
 	}
@@ -1126,7 +1127,8 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 		
 		/* Write a (name hash, offset) pair for each name */
 		*nameLookupCursor++ = stringEntry->hash;
-		*nameLookupCursor++ = (uint32_t)RelativeOffset(nameLookupCursor, baseMemory, pj->nameStringOffset + stringEntry->offset);
+		*nameLookupCursor = (uint32_t)RelativeOffset(nameLookupCursor, baseMemory, pj->nameStringOffset + stringEntry->offset);
+		++nameLookupCursor;
 
 		dst = baseMemory + pj->nameStringOffset + stringEntry->offset;
 		memcpy(dst, stringEntry->utf8, stringEntry->byteCount);

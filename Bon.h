@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef uint64_t		BonValue;
 typedef uint32_t		BonName;

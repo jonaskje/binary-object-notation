@@ -3,7 +3,9 @@
 #include "Beon.h"
 
 #include <stdlib.h>
+#ifdef _WIN32
 #include <crtdbg.h>
+#endif
 #include <assert.h>
 #include <string.h>
 #include <stddef.h>
@@ -58,7 +60,9 @@ ParseTests(void) {
 int 
 main(int argc, char** argv) {
 	ParseTests();
+#ifdef _WIN32
 	_CrtDumpMemoryLeaks();
+#endif
 	return 0;
 }
 
