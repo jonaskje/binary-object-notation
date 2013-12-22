@@ -24,6 +24,9 @@
     <ClCompile Include="BonConvert.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BonTest.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bon.h">

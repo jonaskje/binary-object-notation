@@ -1,13 +1,6 @@
 #pragma once
 
-#pragma warning(push)
-#pragma warning(disable : 4001)
-#define _CRTDBG_MAP_ALLOC
 #include <stdint.h>
-#pragma warning(pop)
-
-#pragma warning(push)
-#pragma warning(disable : 4820) /* N bytes padding added after data member X */
 
 typedef uint64_t		BonValue;
 typedef uint32_t		BonName;
@@ -20,6 +13,7 @@ typedef struct BonRecord {
 	uint16_t		reserved0;
 	uint32_t		reserved1;
 	int32_t			nameLookupTableOffset;		
+	BonValue		rootValue;
 } BonRecord;
 
 typedef struct BonObject {
@@ -45,12 +39,13 @@ typedef struct BonArray {
 
 /* Reading */
 
-BonBool				BonIsAValidRecord(BonRecord* br, size_t sizeBytes);
+BonBool				BonIsAValidRecord(const BonRecord* br, size_t sizeBytes);
 
-const char*			BonGetNameString(BonRecord* br, BonName name);
-BonValue*			BonGetRootValue(BonRecord* br);
+const char*			BonGetNameString(const BonRecord* br, BonName name);
+const BonValue*			BonGetRootValue(const BonRecord* br);
 
-int				BonGetValueType(BonValue* value);
+int				BonGetValueType(const BonValue* value);
+BonBool				BonIsNullValue(const BonValue* value);
 
 BonObject			BonAsObject(const BonValue* bv);
 BonArray			BonAsArray(const BonValue* bv);
@@ -62,4 +57,3 @@ const double*			BonAsNumberArray(const BonArray* ba);
 
 BonName				BonCreateName(const char* nameString, size_t nameStringByteCount);
 
-#pragma warning(pop)

@@ -1,8 +1,5 @@
 #include "Bon.h"
 
-#pragma warning(push)
-#pragma warning(disable : 4001)	/* Single line comments */
-#pragma warning(disable : 4820) /* N bytes padding added after data member X */
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <assert.h>
@@ -10,13 +7,19 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <stdio.h>
-#pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable : 4127)	/* Conditional expression is constant */
-#pragma warning(disable : 4820) /* N bytes padding added after data member X */
-#pragma warning(disable : 4100) /* Unreferenced formal parameter */
+typedef struct BonContainerHeader {
+	int32_t			capacity;
+	int32_t			count;
+} BonContainerHeader;
 
+typedef struct BonNameAndOffset {
+	BonName			name;
+	int32_t			offset;
+} BonNameAndOffset;
+
+#define BON_VALUE_TYPE(v)	((int)(*(v) & 0x7ull))
+#define BON_VALUE_PTR(v)	((void*)((uint8_t*)(v) + (*((int32_t*)(v) + 1))))
 
 /*---------------------------------------------------------------------------*/
 /* Utilities */
@@ -83,10 +86,106 @@ Hash32(const void *data, uint32_t nbytes) {
 /*---------------------------------------------------------------------------*/
 /* :Reading */
 
-const char*
-BonGetNameString(BonRecord* br, BonName name) {
+
+BonBool				
+BonIsAValidRecord(const BonRecord* br, size_t sizeBytes) {
 	assert(0);
-	return 0;
+	return BON_TRUE;
+}
+
+static int 
+NameCompare(const void * a, const void * b) {
+	return ((BonNameAndOffset*)a)->name - ((BonNameAndOffset*)b)->name;
+}
+
+
+const char*
+BonGetNameString(const BonRecord* br, BonName name) {
+	BonContainerHeader*	header		= (BonContainerHeader*)((uint8_t*)&br->nameLookupTableOffset + br->nameLookupTableOffset);
+	BonNameAndOffset*	nameLookup	= (BonNameAndOffset*)(&header[1]);
+	BonNameAndOffset	key;
+	BonNameAndOffset*	item;
+	key.name		= name;
+	key.offset		= 0;
+	item = bsearch(&key, nameLookup, header->count, sizeof(BonNameAndOffset), NameCompare);
+	if (!item) {
+		return 0;
+	}
+	return (const char*)((uint8_t*)&item->offset + item->offset);
+}
+
+const BonValue*
+BonGetRootValue(const BonRecord* br) {
+	return &br->rootValue;
+}
+
+int				
+BonGetValueType(const BonValue* bv) {
+	return (int)(uint64_t)(*bv) & 0x7ull;
+}
+
+BonBool				
+BonIsNullValue(const BonValue* value) {
+	return *value == 0x7ull;
+}
+
+BonObject			
+BonAsObject(const BonValue* bv) {
+	BonObject o;
+	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+	if (BON_VALUE_TYPE(bv) != BON_VT_OBJECT) {
+		assert(0 && "Expected BON_VT_OBJECT");
+		o.count		= 0;
+		o.names		= 0;
+		o.values	= 0;
+		return o;
+	}
+	o.count		= header->count;
+	o.values	= (BonValue*)&header[1];
+	o.names		= (BonName*)&o.values[o.count];
+	return o;
+}
+
+BonArray			
+BonAsArray(const BonValue* bv) {
+	BonArray o;
+	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+	if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
+		assert(0 && "Expected BON_VT_ARRAY");
+		o.count		= 0;
+		o.values	= 0;
+		return o;
+	}
+	o.count		= header->count;
+	o.values	= (BonValue*)&header[1];
+	return o;
+}
+
+double				
+BonAsNumber(const BonValue* bv) {
+	if (BON_VALUE_TYPE(bv) != BON_VT_NUMBER) {
+		assert(0 && "Expected BON_VT_NUMBER");
+		return 0.0;
+	}
+	return *(double*)bv;
+}
+
+const char*			
+BonAsString(const BonValue* bv) {
+	if (BON_VALUE_TYPE(bv) != BON_VT_STRING) {
+		assert(0 && "Expected BON_VT_STRING");
+		return "";
+	}
+	return (const char*)BON_VALUE_PTR(bv);
+}
+
+BonBool				
+BonAsBool(const BonValue* bv) {
+	if (BON_VALUE_TYPE(bv) != BON_VT_BOOL) {
+		assert(0 && "Expected BON_VT_BOOL");
+		return BON_FALSE;
+	}
+	return (*(int32_t*)bv);
 }
 
 BonName				
@@ -94,4 +193,3 @@ BonCreateName(const char* nameString, size_t nameStringByteCount) {
 	return Hash32(nameString, (uint32_t)nameStringByteCount);
 }
 
-#pragma warning(pop)

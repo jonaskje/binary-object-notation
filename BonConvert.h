@@ -2,6 +2,8 @@
 
 #include "Bon.h"
 
+#include <stdio.h>
+
 #define BON_STATUS_OK			0
 #define BON_STATUS_INVALID_JSON_TEXT	1
 #define BON_STATUS_JSON_PARSE_ERROR	2
@@ -22,8 +24,9 @@ struct BonParsedJson;
 struct BonParsedJson*		BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount);
 int				BonGetParsedJsonStatus(struct BonParsedJson* parsedJson);
 size_t				BonGetBonRecordSize(struct BonParsedJson* parsedJson);
-const BonRecord*		BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory);
+BonRecord*			BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory);
 
 /* Return a BonRecord allocated with standard malloc. */
-const BonRecord*		BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount);
+BonRecord*			BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount);
 
+void				BonWriteAsJsonToStream(const BonRecord* record, FILE* stream);

@@ -1,8 +1,5 @@
 #include "BonConvert.h"
 
-#pragma warning(push)
-#pragma warning(disable : 4001)							/* Single line comments */
-#pragma warning(disable : 4820)							/* N bytes padding added after data member X */
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <assert.h>
@@ -11,12 +8,6 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include <ctype.h>
-#pragma warning(pop)
-
-#pragma warning(push)
-#pragma warning(disable : 4127)							/* Conditional expression is constant */
-#pragma warning(disable : 4820)							/* N bytes padding added after data member X */
-#pragma warning(disable : 4100)							/* Unreferenced formal parameter */
 
 /*---------------------------------------------------------------------------*/
 /* List helpers */
@@ -403,9 +394,9 @@ static void			ParseValue(BonParsedJson* pj, BonVariant* value);
 static void			ParseObject(BonParsedJson* pj, BonObjectHead* objectHead);
 static void			ParseArray(BonParsedJson* pj, BonArrayHead* arrayHead);
 
-static BonVariant		s_nullVariant		= { BON_VT_NULL, 0 };
-static BonVariant		s_boolFalseVariant	= { BON_VT_BOOL, BON_FALSE };
-static BonVariant		s_boolTrueVariant	= { BON_VT_BOOL, BON_TRUE };
+static BonVariant		s_nullVariant		= { 0, BON_VT_NULL };
+static BonVariant		s_boolFalseVariant	= { BON_FALSE, BON_VT_BOOL };
+static BonVariant		s_boolTrueVariant	= { BON_TRUE, BON_VT_BOOL };
 
 static BonObjectEntry*
 AppendObjectMember(BonParsedJson* pj, BonObjectEntry** objectHead) {
@@ -1008,19 +999,19 @@ RelativeOffset(void* from, void* basePtr, size_t offsetFromBase) {
 static BonValue
 MakeObjectValue(ptrdiff_t relativeOffset) {
 	assert((relativeOffset & 0x7ll) == 0);
-	return (BonValue)relativeOffset | (BonValue)BON_VT_OBJECT;
+	return ((BonValue)relativeOffset << 32) | (BonValue)BON_VT_OBJECT;
 }
 
 static BonValue
 MakeArrayValue(ptrdiff_t relativeOffset) {
 	assert((relativeOffset & 0x7ll) == 0);
-	return (BonValue)relativeOffset | (BonValue)BON_VT_ARRAY;
+	return ((BonValue)relativeOffset << 32) | (BonValue)BON_VT_ARRAY;
 }
 
 static BonValue
 MakeStringValue(ptrdiff_t relativeOffset) {
 	assert((relativeOffset & 0x7ll) == 0);
-	return (BonValue)relativeOffset | (BonValue)BON_VT_STRING;
+	return ((BonValue)relativeOffset << 32) | (BonValue)BON_VT_STRING;
 }
 
 static BonValue
@@ -1034,9 +1025,14 @@ MakeNullValue(void) {
 }
 
 static BonValue
+MakeNumberValue(const BonVariant* v) {
+	return (v->value.value & ~0x7ull);
+}
+
+static BonValue
 MakeValueFromVariant(BonParsedJson* pj, BonValue* value, BonVariant* v) {
 	switch (v->type) {
-	case BON_VT_NUMBER:	return v->value.value;	/* Effectively cast double to BonValue */
+	case BON_VT_NUMBER:	return MakeNumberValue(v);
 	case BON_VT_BOOL:	return MakeBoolValue(v->value.boolValue);
 	case BON_VT_STRING:	return MakeStringValue(RelativeOffset(value, pj->recordBaseMemory, pj->valueStringOffset + v->value.stringValue->alias->offset));
 	case BON_VT_ARRAY:	return MakeArrayValue(RelativeOffset(value, pj->recordBaseMemory, pj->arrayOffset + v->value.arrayValue->offset));
@@ -1047,7 +1043,7 @@ MakeValueFromVariant(BonParsedJson* pj, BonValue* value, BonVariant* v) {
 }
 
 
-const BonRecord*		
+BonRecord*		
 BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 	/* Exploit fact that both arrayValue and objectValue has a BonContainer as the first member */
 	BonContainer*		p		= pj->containerList;
@@ -1067,6 +1063,7 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 	header->reserved1		= 0;
 	header->version			= 0;
 	header->nameLookupTableOffset	= (int32_t)RelativeOffset(&header->nameLookupTableOffset, baseMemory, pj->nameLookupOffset);
+	header->rootValue		= MakeValueFromVariant(pj, &header->rootValue, &pj->rootValue);
 
 	/* Containers and arrays */
 	for (; p; p = p->next) {
@@ -1198,10 +1195,10 @@ FreeParsedJson(BonParsedJson* parsedJson) {
 	}
 }
 
-const BonRecord*		
+BonRecord*		
 BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
 	BonParsedJson*		parsedJson	= BonParseJson(malloc, jsonString, jsonStringByteCount);
-	const BonRecord*	bonRecord;
+	BonRecord*		bonRecord;
 
 	if (parsedJson->status != BON_STATUS_OK) {
 		FreeParsedJson(parsedJson);
@@ -1215,76 +1212,85 @@ BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* :Testing */
+/* Output */
 
-/* Tests starting with + are expected to succeed and those that start with - are expected to fail */
-static const char s_tests[] =
-	"+{\"apa\":false,\"Skill\":null,\"foo\":\"Hello\",\"child\":{\"apa\":96.0}}\0"
-	"+[]\0"
-	"+[1, 2.3, -1, 2.0e-1, 0.333e+23, 0.44E8, 123123123.4E-3]\0"
-	"+[false,true,null,false,\"apa\",{},[]]\0"
-	"+[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,null]]\0"
-	"-[\0"
-	"-\0"
-	"-25\0"
-	"-[ \"abc ]\0"
-	"-[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,nul]]\0"
-	"\0";									/* Terminate tests */
+typedef struct JSONPrinter {
+	const BonRecord*	doc;
+	int			indent;
+	FILE*			stream;
+} JSONPrinter;
 
-int 
-main(int argc, char** argv) {
-	const char* test = s_tests;
-	int testNum = 0;
-	/*
-	const char test2[] = "0.232e23";
-	size_t tl = sizeof(test2) - 1;
-	const char* endptr = 0;
-	double result = StringToDouble(test2, tl-1, &endptr);
-	int failure = endptr == test2;
-	(void)result;
-	(void)failure;
-	*/
-	ptrdiff_t x  = 	RelativeOffset((void*)32, (void*)24, 0);
-	(void)x;
 
-	assert(BonCreateName("apa", 3) != BonCreateName("foo", 3));
-
-	while(*test) {
-		int expectedResult		= (*test++ == '+') ? BON_TRUE : BON_FALSE;
-		size_t len			= strlen(test);
-
-		/*BonParsedJson* parsedJson	= BonParseJson(malloc, test, len);
-		if (!parsedJson) {
-		*/
-
-		const BonRecord* br = BonCreateRecordFromJson(test, len);
-		if (!br) {
-			if (expectedResult == BON_TRUE) {
-				printf("FAIL (-): %s\n", test);
-			}
-		} else {
-			if (expectedResult == BON_FALSE) {
-				printf("FAIL (-): %s\n", test);
-			}
-			free((void*)br);
-			/*
-			if ((parsedJson->status == BON_STATUS_OK) != expectedResult) {
-				printf("FAIL (%d): %s\n", parsedJson->status, test);
-			} 
-			if ((parsedJson->status == BON_STATUS_OK)) {
-				printf("%d: Size: %lu\n", testNum, (unsigned long)parsedJson->bonRecordSize);
-			}
-			*/
-		}
-
-		testNum++;
-		
-		/*FreeParsedJson(parsedJson);*/
-		test += len + 1;
+static const char* 
+IndentStr(int indent) {
+	static const char empty[] = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	const char* indentStr = empty + sizeof(empty)-1;
+	indentStr -= indent;
+	if (indentStr < empty) {
+		indentStr = empty;
 	}
-
-	_CrtDumpMemoryLeaks();
-	return 0;
+	return indentStr;
 }
 
-#pragma warning(pop)
+static void 
+printAsJSON(JSONPrinter* p, const BonValue* v, BonBool lastInList, const char* IndentString)
+{
+	if (BonIsNullValue(v)) {
+		fprintf(p->stream, "%snull", IndentString);
+	} else {
+		switch (BonGetValueType(v)) {
+		case BON_VT_BOOL:
+			fprintf(p->stream, "%s%s", IndentString, (BonAsBool(v) ? "true" : "false"));
+			break;
+		case BON_VT_NUMBER:
+			fprintf(p->stream, "%s%f", IndentString, BonAsNumber(v));
+			break;
+		case BON_VT_STRING:
+			fprintf(p->stream, "%s\"%s\"", IndentString, BonAsString(v));
+			break;
+		case BON_VT_ARRAY: {
+			BonArray array = BonAsArray(v);
+			int i;
+			fprintf(p->stream, "%s[\n", IndentString);
+			p->indent++;
+			for (i = 0; i < array.count; ++i) {
+				printAsJSON(p, &array.values[i], i == array.count - 1, IndentStr(p->indent));
+			}
+			p->indent--;
+			fprintf(p->stream, "%s]", IndentStr(p->indent));
+			break;
+		}
+		case BON_VT_OBJECT: {
+			BonObject object = BonAsObject(v);
+			int i;
+			fprintf(p->stream, "%s{\n", IndentString);
+			p->indent++;
+			for (i = 0; i < object.count; ++i) {
+				const char* nameString = BonGetNameString(p->doc, object.names[i]);
+				fprintf(p->stream, "%s\"%s\" : ", IndentStr(p->indent), nameString);
+				printAsJSON(p, &object.values[i], i == object.count - 1, "");
+			}
+			p->indent--;
+			fprintf(p->stream, "%s}", IndentStr(p->indent));
+			break;
+		}
+		default:
+			fprintf(p->stream, "%s!!!invalid!!!", IndentString);
+			break;
+		}
+	}
+	if (lastInList) {
+		fprintf(p->stream, "\n");
+	} else {
+		fprintf(p->stream, ",\n");
+	}
+}
+
+void				
+BonWriteAsJsonToStream(const BonRecord* record, FILE* stream) {
+	JSONPrinter printer;
+	printer.doc		= record;
+	printer.indent		= 0;
+	printer.stream		= stream;
+	printAsJSON(&printer, BonGetRootValue(record), BON_TRUE, "");
+}
