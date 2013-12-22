@@ -17,6 +17,8 @@
 		*(head) = obj; \
 	} while (0)
 
+/* Standard isdigit was too expensive (about 20% of total time when parsing a number-dense file) */
+#define IsDigit(c) (((c) >= (uint8_t)'0') & ((c) <= (uint8_t)'9'))
 
 /* Mergesort adapted from http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.c
  *
@@ -157,7 +159,7 @@ typedef struct BonObjectEntry {
 
 typedef struct BonParsedJson {
 	/* Setup */
-	BonTempMemoryAllocator	alloc;
+	BonTempMemoryAlloc	alloc;
 	const uint8_t*		jsonString;
 	const uint8_t*		jsonStringEnd;
 
@@ -216,7 +218,7 @@ GiveUp(jmp_buf* env, int status) {
 }
 
 static void*
-DoTempCalloc(BonTempMemoryAllocator alloc, jmp_buf* exceptionEnv, size_t size) {
+DoTempCalloc(BonTempMemoryAlloc alloc, jmp_buf* exceptionEnv, size_t size) {
 	void* result = alloc(size);
 	if (!result) {
 		GiveUp(exceptionEnv, BON_STATUS_OUT_OF_MEMORY);
@@ -615,7 +617,7 @@ StringToDouble(const char* string, size_t n, const char** endPtr) {
 	for (mantSize = 0; p != pEnd; mantSize += 1)
 	{
 		c = *p;
-		if (!isdigit(c)) {
+		if (!IsDigit(c)) {
 			if ((c != '.') || (decPt >= 0)) {
 				break;
 			}
@@ -697,7 +699,7 @@ StringToDouble(const char* string, size_t n, const char** endPtr) {
 			}
 		}
 
-		while (p != pEnd && isdigit((unsigned char)*p)) {
+		while (p != pEnd && IsDigit((unsigned char)*p)) {
 			exp = exp * 10 + (*p - '0');
 			p += 1;
 		}
@@ -905,7 +907,7 @@ ComputeVariantOffsets(BonParsedJson* pj) {
 }
 
 BonParsedJson*
-BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount) {
+BonParseJson(BonTempMemoryAlloc tempAllocator, const char* jsonString, size_t jsonStringByteCount) {
 	BonParsedJson*		pj = 0;
 	jmp_buf			errorJmpBuf;
 	int			status;
@@ -1141,14 +1143,14 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 }
 
 static void
-FreeString(BonStringEntry* v) {
+FreeString(BonStringEntry* v, BonTempMemoryFree freeFun) {
 	if (!v)
 		return;
-	free(v);
+	freeFun(v);
 }
 
 static void 
-FreeVariant(BonVariant* v) {
+FreeVariant(BonVariant* v, BonTempMemoryFree freeFun) {
 	switch (v->type) {
 	case BON_VT_OBJECT: {
 		BonObjectHead* head = v->value.objectValue;
@@ -1156,12 +1158,12 @@ FreeVariant(BonVariant* v) {
 		if (!head)
 			break;
 		p = head->memberList;
-		free(head);
+		freeFun(head);
 		while (p) {
 			BonObjectEntry* next = p->next;
-			FreeString(p->name);
-			FreeVariant(&p->value);
-			free(p);
+			FreeString(p->name, freeFun);
+			FreeVariant(&p->value, freeFun);
+			freeFun(p);
 			p = next;
 		}
 		break;
@@ -1172,28 +1174,28 @@ FreeVariant(BonVariant* v) {
 		if (!head)
 			break;
 		p = head->valueList;
-		free(head);
+		freeFun(head);
 		while (p) {
 			BonArrayEntry* next = p->next;
-			FreeVariant(&p->value);
-			free(p);
+			FreeVariant(&p->value, freeFun);
+			freeFun(p);
 			p = next;
 		}
 		break;
 	}
 	case BON_VT_STRING: {
-		FreeString(v->value.stringValue);
+		FreeString(v->value.stringValue, freeFun);
 		break;
 	}
 
 	}
 }
 
-static void 
-FreeParsedJson(BonParsedJson* parsedJson) {
+void 
+BonFreeParsedJsonMemory(BonParsedJson* parsedJson, BonTempMemoryFree freeFun) {
 	if (parsedJson) {
-		FreeVariant(&parsedJson->rootValue);
-		free(parsedJson);
+		FreeVariant(&parsedJson->rootValue, freeFun);
+		freeFun(parsedJson);
 	}
 }
 
@@ -1203,12 +1205,12 @@ BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
 	BonRecord*		bonRecord;
 
 	if (parsedJson->status != BON_STATUS_OK) {
-		FreeParsedJson(parsedJson);
+		BonFreeParsedJsonMemory(parsedJson, free);
 		return 0;
 	}
 
 	bonRecord = BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
-	FreeParsedJson(parsedJson);
+	BonFreeParsedJsonMemory(parsedJson, free);
 
 	return bonRecord;
 }

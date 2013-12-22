@@ -11,8 +11,9 @@
 #define BON_STATUS_OUT_OF_MEMORY	4
 #define BON_STATUS_INVALID_NUMBER	5
 
-/* Must return a memory block with alignment suitable for storing a pointer */
-typedef void* (*BonTempMemoryAllocator)(size_t byteCount);
+/* Must return a memory block with 8 byte alignment */
+typedef void*			(*BonTempMemoryAlloc)(size_t byteCount);
+typedef void			(*BonTempMemoryFree)(void*);
 
 struct BonParsedJson;
 
@@ -21,7 +22,13 @@ struct BonParsedJson;
  * Check for failure with BonGetParsedJsonStatus.
  * If a valid object is returned, then the memory allocated from tempAllocator must be cleaned up by the caller.
  */
-struct BonParsedJson*		BonParseJson(BonTempMemoryAllocator tempAllocator, const char* jsonString, size_t jsonStringByteCount);
+struct BonParsedJson*		BonParseJson(BonTempMemoryAlloc tempAllocator, const char* jsonString, size_t jsonStringByteCount);
+
+/* Free all memory allocated for parsedJson including parsedJson itself.
+ * Only needed when, for example, using a heap allocator as tempAllocator in BonParseJson
+ */
+void				BonFreeParsedJsonMemory(struct BonParsedJson* parsedJson, BonTempMemoryFree freeFun);
+
 int				BonGetParsedJsonStatus(struct BonParsedJson* parsedJson);
 size_t				BonGetBonRecordSize(struct BonParsedJson* parsedJson);
 BonRecord*			BonCreateRecordFromParsedJson(struct BonParsedJson* parsedJson, void* recordMemory);

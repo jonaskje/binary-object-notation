@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <time.h>
 
 /*---------------------------------------------------------------------------*/
 /* :Testing */
@@ -57,9 +58,124 @@ ParseTests(void) {
 	}
 }
 
+uint8_t* 
+LoadAll(size_t* filesizeOut, const char* fn) {
+	FILE* f;
+	uint8_t* docBufData;
+	if (filesizeOut)
+		*filesizeOut = 0;
+
+	f = fopen(fn, "rb");
+	if (!f)
+		return 0;
+	fseek(f, 0, SEEK_END);
+	long filesize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	docBufData = (uint8_t*)malloc((size_t)filesize);
+	if (!docBufData)
+		return 0;
+
+	fread(docBufData, (size_t)filesize, 1, f);
+	fclose(f);
+
+	if (filesizeOut)
+		*filesizeOut = (size_t)filesize;
+
+	return docBufData;
+}
+
+typedef struct LinearAllocator {
+	uint8_t*		mem;
+	uint8_t*		memEnd;
+	uint8_t*		cursor;
+} LinearAllocator;
+
+LinearAllocator g_linearAllocator;
+
+static size_t
+DoRoundUp(size_t value, size_t multiple) {
+	if (multiple == 0) {
+		return value;
+	}
+	else {
+		const size_t remainder = value % multiple;
+		if (remainder == 0)
+			return value;
+		return value + multiple - remainder;
+	}
+}
+
+
+static void*
+LinearAlloc(size_t size) {
+	size = DoRoundUp(size, 8);
+	if (g_linearAllocator.cursor + size <= g_linearAllocator.memEnd) {
+		void* r = g_linearAllocator.cursor;
+		g_linearAllocator.cursor += size;
+		return r;
+	} else {
+		return 0;
+	}
+}
+
+BonRecord*
+TestCreateRecordFromJsonUsingLinearAllocator(const char* jsonString, size_t jsonStringByteCount) {
+	struct BonParsedJson*	parsedJson;
+	BonRecord*		bonRecord = 0;
+
+	parsedJson = BonParseJson(LinearAlloc, jsonString, jsonStringByteCount);
+	if (BonGetParsedJsonStatus(parsedJson) != BON_STATUS_OK) {
+		g_linearAllocator.cursor = g_linearAllocator.mem;
+		return 0;
+	}
+
+	/*bonRecord = BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
+	printf ("Used mem %u\n", (unsigned)(g_linearAllocator.cursor - g_linearAllocator.mem));*/
+	g_linearAllocator.cursor = g_linearAllocator.mem;
+
+	return bonRecord;
+}
+
+#define LA
+void
+BigTest(void) {
+	int i;
+	clock_t start, end;
+	size_t jsonSize = 0;
+	uint8_t* json = LoadAll(&jsonSize, 
+		"c:\\Users\\Jonas\\Proj\\E2\\Data\\Kristian_skeleton.json"
+/*		"c:\\Users\\Jonas\\Proj\\E2\\Test\\bigtest.json"*/
+		);
+
+	const size_t		memSize = 1024 * 1024 * 256;
+	g_linearAllocator.mem = malloc(memSize);
+	g_linearAllocator.memEnd = g_linearAllocator.mem + memSize;
+	g_linearAllocator.cursor = g_linearAllocator.mem;
+
+	assert(json);
+
+	start = clock();
+	for (i = 0; i < 1000; ++i) {
+#ifdef LA
+		BonRecord* br = TestCreateRecordFromJsonUsingLinearAllocator((const char*)json, jsonSize);
+#else
+		BonRecord* br = BonCreateRecordFromJson((const char*)json, jsonSize);
+#endif
+		if (br)
+			free(br);
+	}
+	free(json);
+	free(g_linearAllocator.mem);
+
+	end = clock();
+	printf("Elapsed: %8.4f\n", (float)(end - start)/CLOCKS_PER_SEC);
+}
+
 int 
 main(int argc, char** argv) {
 	ParseTests();
+	/*BigTest();*/
 #ifdef _WIN32
 	_CrtDumpMemoryLeaks();
 #endif
