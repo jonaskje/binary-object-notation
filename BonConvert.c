@@ -158,14 +158,13 @@ typedef struct BonObjectEntry {
 } BonObjectEntry;
 
 typedef struct BonParsedJson {
-	/* Setup */
 	BonTempMemoryAlloc	alloc;
 	void*			allocUserdata;
+
 	const uint8_t*		jsonString;
 	const uint8_t*		jsonStringEnd;
-
-	/* Parse context */
 	const uint8_t*		cursor;
+	
 	jmp_buf*		env;
 
 	BonStringEntry*		nameStringList;
@@ -189,7 +188,6 @@ typedef struct BonParsedJson {
 
 	void*			recordBaseMemory;
 
-	/* Results */
 	int			status;
 	size_t			bonRecordSize;
 	BonVariant		rootValue;
@@ -1061,10 +1059,8 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 
 	/* Header */
 	header->magic			= BonFourCC('B', 'O', 'N', ' ');
-	header->flags			= 0;
-	header->reserved0		= 0;
+	header->reserved		= 0;
 	header->recordSize		= (uint32_t)pj->bonRecordSize;
-	header->version			= 0;
 	header->nameLookupTableOffset	= (int32_t)RelativeOffset(&header->nameLookupTableOffset, baseMemory, pj->nameLookupOffset);
 	header->rootValue		= MakeValueFromVariant(pj, &header->rootValue, &pj->rootValue);
 

@@ -17,6 +17,7 @@
 
 /* Tests starting with + are expected to succeed and those that start with - are expected to fail */
 static const char s_tests[] =
+	"+   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]			\0"
 	"+[false,true,null,false,\"apa\",{},[]]\0"
 	"+[1, 2.3, -1, 2.0e-1, 0.333e+23, 0.44E8, 123123123.4E-3]\0"
 	"+{\"apa\":false,\"Skill\":null,\"foo\":\"Hello\",\"child\":{\"apa\":96.0}}\0"
@@ -103,10 +104,28 @@ ParseTests(void) {
 		else {
 			if (expectedResult == BON_FALSE) {
 				printf("FAIL (-): %s\n", test);
-			}
-			/*BonWriteAsJsonToStream(br, stdout);*/
-			if (!ReadBackCompareTest(br)) {
-				printf("FAIL (R): %s\n", test);
+			} else {
+				if (!BonIsAValidRecord(br)) {
+					printf("FAIL (V): %s\n", test);
+				}
+				/*BonWriteAsJsonToStream(br, stdout);*/
+				if (!ReadBackCompareTest(br)) {
+					printf("FAIL (R): %s\n", test);
+				}
+
+				if (testNum == 0) {
+					int i;
+					double d = 0.0;
+					BonArray ba = BonAsArray(BonGetRootValue(br));
+					const double* numbers = BonAsNumberArray(&ba);
+					for (i = 0; i < 10; ++i) {
+						if (d != numbers[i]) {
+							printf("FAIL (N): %s\n", test);
+							break;
+						}
+						d = d + 1.0;
+					}
+				}
 			}
 			free(br);
 		}

@@ -81,22 +81,29 @@ Hash32(const void *data, uint32_t nbytes) {
 	return h;
 }
 
-
-/*---------------------------------------------------------------------------*/
-/* :Reading */
-
-
-BonBool				
-BonIsAValidRecord(const BonRecord* br, size_t sizeBytes) {
-	assert(0);
-	return BON_TRUE;
-}
-
 static int 
 NameCompare(const void * a, const void * b) {
 	return ((BonNameAndOffset*)a)->name - ((BonNameAndOffset*)b)->name;
 }
 
+/*---------------------------------------------------------------------------*/
+
+BonBool				
+BonIsAValidRecord(const BonRecord* br) {
+	const char* magicChars;
+	if (!br)
+		return BON_FALSE;
+	magicChars = (const char*)&br->magic;
+	if (!(magicChars[0] == 'B' && magicChars[1] == 'O' && magicChars[2] == 'N' && magicChars[3] == ' ')) {
+		return BON_FALSE;
+	}
+	return BON_TRUE;
+}
+
+uint32_t			
+BonGetRecordSize(const BonRecord* br) {
+	return br->recordSize;
+}
 
 const char*
 BonGetNameString(const BonRecord* br, BonName name) {
@@ -185,6 +192,12 @@ BonAsBool(const BonValue* bv) {
 		return BON_FALSE;
 	}
 	return (*((int32_t*)(bv) + 1));
+}
+
+const double*			
+BonAsNumberArray(const BonArray* ba) {
+	/* TODO: A debug check that all elements are BON_VT_NUMBER */
+	return (const double*)ba->values;
 }
 
 BonName				

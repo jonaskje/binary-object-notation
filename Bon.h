@@ -9,9 +9,7 @@ typedef int			BonBool;
 
 typedef struct BonRecord {
 	uint32_t		magic;
-	uint8_t			version;
-	uint8_t			flags;
-	uint16_t		reserved0;
+	uint32_t		reserved;
 	uint32_t		recordSize;
 	int32_t			nameLookupTableOffset;		
 	BonValue		rootValue;
@@ -38,9 +36,8 @@ typedef struct BonArray {
 #define BON_FALSE		0
 #define BON_TRUE		1
 
-/* Reading */
-
-BonBool				BonIsAValidRecord(const BonRecord* br, size_t sizeBytes);
+BonBool				BonIsAValidRecord(const BonRecord* br);
+uint32_t			BonGetRecordSize(const BonRecord* br);
 
 const char*			BonGetNameString(const BonRecord* br, BonName name);
 const BonValue*			BonGetRootValue(const BonRecord* br);
