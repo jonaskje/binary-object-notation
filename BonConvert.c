@@ -160,6 +160,7 @@ typedef struct BonObjectEntry {
 typedef struct BonParsedJson {
 	/* Setup */
 	BonTempMemoryAlloc	alloc;
+	void*			allocUserdata;
 	const uint8_t*		jsonString;
 	const uint8_t*		jsonStringEnd;
 
@@ -218,8 +219,8 @@ GiveUp(jmp_buf* env, int status) {
 }
 
 static void*
-DoTempCalloc(BonTempMemoryAlloc alloc, jmp_buf* exceptionEnv, size_t size) {
-	void* result = alloc(size);
+DoTempCalloc(BonTempMemoryAlloc alloc, void* userdata, jmp_buf* exceptionEnv, size_t size) {
+	void* result = alloc(userdata, size);
 	if (!result) {
 		GiveUp(exceptionEnv, BON_STATUS_OUT_OF_MEMORY);
 	}
@@ -228,21 +229,21 @@ DoTempCalloc(BonTempMemoryAlloc alloc, jmp_buf* exceptionEnv, size_t size) {
 
 #define BonFourCC(a,b,c,d)		((uint32_t) (((d)<<24) | ((c)<<16) | ((b)<<8) | (a)))
 
-#define BonTempCalloc(tempAllocator, exceptionEnv, type) ((type*)DoTempCalloc(tempAllocator, exceptionEnv, sizeof(type)))
+#define BonTempCalloc(tempAlloc, tempAllocUserdata, exceptionEnv, type) ((type*)DoTempCalloc(tempAlloc, tempAllocUserdata, exceptionEnv, sizeof(type)))
 
 static BonObjectEntry*
 CreateObjectEntry(BonParsedJson* pj) {
-	return BonTempCalloc(pj->alloc, pj->env, BonObjectEntry);
+	return BonTempCalloc(pj->alloc, pj->allocUserdata, pj->env, BonObjectEntry);
 }
 
 static BonArrayEntry*
 CreateArrayEntry(BonParsedJson* pj) {
-	return BonTempCalloc(pj->alloc, pj->env, BonArrayEntry);
+	return BonTempCalloc(pj->alloc, pj->allocUserdata, pj->env, BonArrayEntry);
 }
 
 static BonObjectHead*
 InitObjectVariant(BonParsedJson* pj, BonVariant* v) {
-	BonObjectHead* head = BonTempCalloc(pj->alloc, pj->env, BonObjectHead);
+	BonObjectHead* head = BonTempCalloc(pj->alloc, pj->allocUserdata, pj->env, BonObjectHead);
 	head->container.type = BON_VT_OBJECT;
 	v->type = BON_VT_OBJECT;
 	v->value.objectValue = head;
@@ -251,7 +252,7 @@ InitObjectVariant(BonParsedJson* pj, BonVariant* v) {
 
 static BonArrayHead*
 InitArrayVariant(BonParsedJson* pj, BonVariant* v) {
-	BonArrayHead* head = BonTempCalloc(pj->alloc, pj->env, BonArrayHead);
+	BonArrayHead* head = BonTempCalloc(pj->alloc, pj->allocUserdata, pj->env, BonArrayHead);
 	head->lastValue = &head->valueList;
 	head->container.type = BON_VT_ARRAY;
 	v->type = BON_VT_ARRAY;
@@ -329,7 +330,7 @@ ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 	bufferSize = offsetof(BonStringEntry, utf8) + stringBufferSize;
 
 	/* So now we know the minimum space we need to parse the string. Allocate it and also make sure there is space for a terminating null */
-	stringEntry = (BonStringEntry*)(pj->alloc)(bufferSize);
+	stringEntry = (BonStringEntry*)(pj->alloc)(pj->allocUserdata, bufferSize);
 	stringEntry->byteCount	= 0;
 	stringEntry->hash	= 0;
 	stringEntry->alias	= stringEntry;	/* I.e. no alias */
@@ -907,23 +908,24 @@ ComputeVariantOffsets(BonParsedJson* pj) {
 }
 
 BonParsedJson*
-BonParseJson(BonTempMemoryAlloc tempAllocator, const char* jsonString, size_t jsonStringByteCount) {
+BonParseJson(BonTempMemoryAlloc tempAlloc, void* tempAllocUserdata, const char* jsonString, size_t jsonStringByteCount) {
 	BonParsedJson*		pj = 0;
 	jmp_buf			errorJmpBuf;
 	int			status;
 
-	if (!tempAllocator)
+	if (!tempAlloc)
 		return 0;
 
 	status = setjmp(errorJmpBuf);
 
 	if (0 == status) {
-		pj = BonTempCalloc(tempAllocator, &errorJmpBuf, BonParsedJson);
+		pj = BonTempCalloc(tempAlloc, tempAllocUserdata, &errorJmpBuf, BonParsedJson);
 		if (!pj) {
 			GiveUp(&errorJmpBuf, BON_STATUS_OUT_OF_MEMORY);
 		}
 		pj->env			= &errorJmpBuf;
-		pj->alloc		= tempAllocator;
+		pj->alloc		= tempAlloc;
+		pj->allocUserdata	= tempAllocUserdata;
 		pj->jsonString		= (const uint8_t*)jsonString;
 		pj->jsonStringEnd	= (const uint8_t*)jsonString + jsonStringByteCount;
 		pj->cursor		= (const uint8_t*)jsonString;
@@ -1143,14 +1145,14 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 }
 
 static void
-FreeString(BonStringEntry* v, BonTempMemoryFree freeFun) {
+FreeString(BonStringEntry* v, BonTempMemoryFree tempFree, void* tempFreeUserdata) {
 	if (!v)
 		return;
-	freeFun(v);
+	tempFree(tempFreeUserdata, v);
 }
 
 static void 
-FreeVariant(BonVariant* v, BonTempMemoryFree freeFun) {
+FreeVariant(BonVariant* v, BonTempMemoryFree tempFree, void* tempFreeUserdata) {
 	switch (v->type) {
 	case BON_VT_OBJECT: {
 		BonObjectHead* head = v->value.objectValue;
@@ -1158,12 +1160,12 @@ FreeVariant(BonVariant* v, BonTempMemoryFree freeFun) {
 		if (!head)
 			break;
 		p = head->memberList;
-		freeFun(head);
+		tempFree(tempFreeUserdata, head);
 		while (p) {
 			BonObjectEntry* next = p->next;
-			FreeString(p->name, freeFun);
-			FreeVariant(&p->value, freeFun);
-			freeFun(p);
+			FreeString(p->name, tempFree, tempFreeUserdata);
+			FreeVariant(&p->value, tempFree, tempFreeUserdata);
+			tempFree(tempFreeUserdata, p);
 			p = next;
 		}
 		break;
@@ -1174,17 +1176,17 @@ FreeVariant(BonVariant* v, BonTempMemoryFree freeFun) {
 		if (!head)
 			break;
 		p = head->valueList;
-		freeFun(head);
+		tempFree(tempFreeUserdata, head);
 		while (p) {
 			BonArrayEntry* next = p->next;
-			FreeVariant(&p->value, freeFun);
-			freeFun(p);
+			FreeVariant(&p->value, tempFree, tempFreeUserdata);
+			tempFree(tempFreeUserdata, p);
 			p = next;
 		}
 		break;
 	}
 	case BON_VT_STRING: {
-		FreeString(v->value.stringValue, freeFun);
+		FreeString(v->value.stringValue, tempFree, tempFreeUserdata);
 		break;
 	}
 
@@ -1192,25 +1194,37 @@ FreeVariant(BonVariant* v, BonTempMemoryFree freeFun) {
 }
 
 void 
-BonFreeParsedJsonMemory(BonParsedJson* parsedJson, BonTempMemoryFree freeFun) {
+BonFreeParsedJsonMemory(BonParsedJson* parsedJson, BonTempMemoryFree tempFree, void* tempFreeUserdata) {
 	if (parsedJson) {
-		FreeVariant(&parsedJson->rootValue, freeFun);
-		freeFun(parsedJson);
+		FreeVariant(&parsedJson->rootValue, tempFree, tempFreeUserdata);
+		tempFree(parsedJson, tempFreeUserdata);
 	}
+}
+
+static void*
+MallocWrap(void* userdata, size_t size) {
+	(void)userdata;
+	return malloc(size);
+}
+
+static void
+FreeWrap(void* userdata, void* p) {
+	(void)userdata;
+	free(p);
 }
 
 BonRecord*		
 BonCreateRecordFromJson(const char* jsonString, size_t jsonStringByteCount) {
-	BonParsedJson*		parsedJson	= BonParseJson(malloc, jsonString, jsonStringByteCount);
+	BonParsedJson*		parsedJson	= BonParseJson(MallocWrap, 0, jsonString, jsonStringByteCount);
 	BonRecord*		bonRecord;
 
 	if (parsedJson->status != BON_STATUS_OK) {
-		BonFreeParsedJsonMemory(parsedJson, free);
+		BonFreeParsedJsonMemory(parsedJson, FreeWrap, 0);
 		return 0;
 	}
 
-	bonRecord = BonCreateRecordFromParsedJson(parsedJson, malloc(BonGetBonRecordSize(parsedJson)));
-	BonFreeParsedJsonMemory(parsedJson, free);
+	bonRecord = BonCreateRecordFromParsedJson(parsedJson, MallocWrap(0, BonGetBonRecordSize(parsedJson)));
+	BonFreeParsedJsonMemory(parsedJson, FreeWrap, 0);
 
 	return bonRecord;
 }

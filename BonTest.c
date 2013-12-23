@@ -108,11 +108,12 @@ DoRoundUp(size_t value, size_t multiple) {
 
 
 static void*
-LinearAlloc(size_t size) {
+LinearAlloc(void* userdata, size_t size) {
+	LinearAllocator* allocator = (LinearAllocator*)userdata;
 	size = DoRoundUp(size, 8);
-	if (g_linearAllocator.cursor + size <= g_linearAllocator.memEnd) {
-		void* r = g_linearAllocator.cursor;
-		g_linearAllocator.cursor += size;
+	if (allocator->cursor + size <= allocator->memEnd) {
+		void* r = allocator->cursor;
+		allocator->cursor += size;
 		return r;
 	} else {
 		return 0;
@@ -124,7 +125,7 @@ TestCreateRecordFromJsonUsingLinearAllocator(const char* jsonString, size_t json
 	struct BonParsedJson*	parsedJson;
 	BonRecord*		bonRecord = 0;
 
-	parsedJson = BonParseJson(LinearAlloc, jsonString, jsonStringByteCount);
+	parsedJson = BonParseJson(LinearAlloc, &g_linearAllocator, jsonString, jsonStringByteCount);
 	if (BonGetParsedJsonStatus(parsedJson) != BON_STATUS_OK) {
 		g_linearAllocator.cursor = g_linearAllocator.mem;
 		return 0;
