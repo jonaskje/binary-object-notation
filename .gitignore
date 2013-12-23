@@ -8,3 +8,6 @@ x64/*
 *.dSYM
 BonTest
 temp.json
+html/*
+latex/*
+

@@ -1,19 +1,9 @@
 #pragma once
+/**
+* @file
+*/
 
-#include <stdint.h>
-#include <stdlib.h>
-
-typedef uint64_t		BonValue;
-typedef uint32_t		BonName;
-typedef int			BonBool;
-
-typedef struct BonRecord {
-	uint32_t		magic;
-	uint32_t		reserved;
-	uint32_t		recordSize;
-	int32_t			nameLookupTableOffset;		
-	BonValue		rootValue;
-} BonRecord;
+#include "BonFormat.h"
 
 typedef struct BonObject {
 	int			count;
@@ -25,16 +15,6 @@ typedef struct BonArray {
 	int			count;
 	const BonValue*		values;
 } BonArray;
-
-#define BON_VT_NUMBER		0
-#define BON_VT_BOOL		1
-#define BON_VT_STRING		3
-#define BON_VT_ARRAY		4
-#define BON_VT_OBJECT		5
-#define BON_VT_NULL		9
-
-#define BON_FALSE		0
-#define BON_TRUE		1
 
 BonBool				BonIsAValidRecord(const BonRecord* br);
 uint32_t			BonGetRecordSize(const BonRecord* br);

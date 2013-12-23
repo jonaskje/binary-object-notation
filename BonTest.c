@@ -225,6 +225,7 @@ BigTest(void) {
 
 int 
 main(int argc, char** argv) {
+	printf ("%08x %08x\n", BonCreateName("a", 1), BonCreateName("b", 1));
 	ParseTests();
 	/*BigTest();*/
 #ifdef _WIN32

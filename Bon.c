@@ -7,16 +7,6 @@
 #include <setjmp.h>
 #include <stdio.h>
 
-typedef struct BonContainerHeader {
-	int32_t			capacity;
-	int32_t			count;
-} BonContainerHeader;
-
-typedef struct BonNameAndOffset {
-	BonName			name;
-	int32_t			offset;
-} BonNameAndOffset;
-
 #define BON_VALUE_TYPE(v)	((int)(*(v) & 0x7ull))
 #define BON_VALUE_PTR(v)	((void*)((uint8_t*)(v) + (*((int32_t*)(v) + 1))))
 
