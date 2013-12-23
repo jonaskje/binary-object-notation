@@ -29,36 +29,7 @@ static const char s_tests[] =
 	"-[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,nul]]\0"
 	"\0";									/* Terminate tests */
 
-static void
-ParseTests(void) {
-	const char* test = s_tests;
-	int testNum = 0;
-
-	while (*test) {
-		int expectedResult = (*test++ == '+') ? BON_TRUE : BON_FALSE;
-		size_t len = strlen(test);
-
-		const BonRecord* br = BonCreateRecordFromJson(test, len);
-		if (!br) {
-			if (expectedResult == BON_TRUE) {
-				printf("FAIL (-): %s\n", test);
-			}
-		}
-		else {
-			if (expectedResult == BON_FALSE) {
-				printf("FAIL (-): %s\n", test);
-			}
-			BonWriteAsJsonToStream(br, stdout);
-			printf("\n\n");
-			free((void*)br);
-		}
-
-		testNum++;
-		test += len + 1;
-	}
-}
-
-uint8_t* 
+static uint8_t* 
 LoadAll(size_t* filesizeOut, const char* fn) {
 	FILE* f;
 	uint8_t* docBufData;
@@ -83,6 +54,66 @@ LoadAll(size_t* filesizeOut, const char* fn) {
 		*filesizeOut = (size_t)filesize;
 
 	return docBufData;
+}
+
+static void
+WriteRecordToDisk(const BonRecord* br, const char* fn) {
+	FILE* f = fopen(fn, "wb");
+	assert(f);
+	if (!f)
+		return;
+	BonWriteAsJsonToStream(br, f);
+	fclose(f);
+}
+
+static BonBool
+ReadBackCompareTest(const BonRecord* br) {
+	BonBool			result		= BON_TRUE;
+	uint8_t*		jsonData;
+	size_t			size;
+	BonRecord*		br2;
+	WriteRecordToDisk(br, "temp.json");
+	jsonData = LoadAll(&size, "temp.json");
+	assert(jsonData);
+	br2 = BonCreateRecordFromJson((const char*)jsonData, size);
+	assert(br2);
+	if (br->recordSize != br2->recordSize || 0 != memcmp(br, br2, br->recordSize)) {
+		result = BON_FALSE;
+	}
+	free(br2);
+	free(jsonData);
+	return result;
+}
+
+static void
+ParseTests(void) {
+	const char* test = s_tests;
+	int testNum = 0;
+
+	while (*test) {
+		int expectedResult = (*test++ == '+') ? BON_TRUE : BON_FALSE;
+		size_t len = strlen(test);
+
+		BonRecord* br = BonCreateRecordFromJson(test, len);
+		if (!br) {
+			if (expectedResult == BON_TRUE) {
+				printf("FAIL (-): %s\n", test);
+			}
+		}
+		else {
+			if (expectedResult == BON_FALSE) {
+				printf("FAIL (-): %s\n", test);
+			}
+			/*BonWriteAsJsonToStream(br, stdout);*/
+			if (!ReadBackCompareTest(br)) {
+				printf("FAIL (R): %s\n", test);
+			}
+			free(br);
+		}
+
+		testNum++;
+		test += len + 1;
+	}
 }
 
 typedef struct LinearAllocator {

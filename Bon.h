@@ -12,7 +12,7 @@ typedef struct BonRecord {
 	uint8_t			version;
 	uint8_t			flags;
 	uint16_t		reserved0;
-	uint32_t		reserved1;
+	uint32_t		recordSize;
 	int32_t			nameLookupTableOffset;		
 	BonValue		rootValue;
 } BonRecord;

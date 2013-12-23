@@ -184,7 +184,7 @@ BonAsBool(const BonValue* bv) {
 		assert(0 && "Expected BON_VT_BOOL");
 		return BON_FALSE;
 	}
-	return (*(int32_t*)bv);
+	return (*((int32_t*)(bv) + 1));
 }
 
 BonName				

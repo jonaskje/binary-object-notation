@@ -1063,7 +1063,7 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 	header->magic			= BonFourCC('B', 'O', 'N', ' ');
 	header->flags			= 0;
 	header->reserved0		= 0;
-	header->reserved1		= 0;
+	header->recordSize		= (uint32_t)pj->bonRecordSize;
 	header->version			= 0;
 	header->nameLookupTableOffset	= (int32_t)RelativeOffset(&header->nameLookupTableOffset, baseMemory, pj->nameLookupOffset);
 	header->rootValue		= MakeValueFromVariant(pj, &header->rootValue, &pj->rootValue);

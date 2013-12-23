@@ -1,3 +1,3 @@
 all:
-	clang *.c -o BonTest
+	clang -g *.c -o BonTest
 
