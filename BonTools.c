@@ -91,6 +91,42 @@ Json2Bon(int argc, char** argv) {
 }
 
 static int 
+Bon2Json(int argc, char** argv) {
+	const char*		usage		= "Convert a BON record to a JSON file.\nUsage: Bon2Json <input bon-file> [<output json-file>]\n";
+	uint8_t*		bonData;
+	size_t			bonDataSize;
+	FILE*			output		= stdout;
+
+	if (argc < 2 || argc > 3) 
+		Usage(usage);
+	bonData = LoadAll(&bonDataSize, argv[1]);
+	if (!bonData)
+		Usage(usage);
+
+	if (!BonIsAValidRecord((const BonRecord*)bonData, bonDataSize)) {
+		fprintf(stderr, "Input file is not a valid BON record.\n");
+		exit(-2);
+	}
+
+	if (argc == 3) {
+		output = fopen(argv[2], "wb");
+		if (!output) {
+			fprintf(stderr, "Failed to open output file\n");
+			exit(-3);
+		}
+	}
+
+	BonWriteAsJsonToStream((const BonRecord*)bonData, output);
+	
+	if (argc == 3) {
+		fclose(output);
+	}
+
+	free(bonData);
+	return 0;
+}
+
+static int 
 DumpBon(int argc, char** argv) {
 	const char* usage = "Dump a BON record in a raw format.\nUsage: BonDump <input bon-file>\n";
 	uint8_t* bonData = 0;
@@ -118,6 +154,9 @@ int
 main(int argc, char** argv) {
 #ifdef BONTOOL_JSON2BON
 	return Json2Bon(argc, argv);
+#endif
+#ifdef BONTOOL_BON2JSON
+	return Bon2Json(argc, argv);
 #endif
 #ifdef BONTOOL_DUMPBON
 	return DumpBon(argc, argv);
