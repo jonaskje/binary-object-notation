@@ -1,4 +1,5 @@
 #include "BonConvert.h"
+#include "BonFormat.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -104,6 +105,11 @@
 struct BonObjectEntry;
 struct BonArrayEntry;
 
+typedef struct BonContainer {
+	struct BonContainer*	next;
+	int			type;
+} BonContainer;
+
 typedef struct BonStringEntry {
 	struct BonStringEntry*	next;
 	struct BonStringEntry*	alias;
@@ -112,11 +118,6 @@ typedef struct BonStringEntry {
 	BonName			hash;
 	uint8_t			utf8[1];
 } BonStringEntry;
-
-typedef struct BonContainer {
-	struct BonContainer*	next;
-	int			type;
-} BonContainer;
 
 typedef struct BonArrayHead {
 	BonContainer		container;
@@ -167,8 +168,8 @@ typedef struct BonParsedJson {
 	
 	jmp_buf*		env;
 
-	BonStringEntry*		nameStringList;
 	BonStringEntry*		valueStringList;
+	BonStringEntry*		nameStringList;
 	BonContainer*		containerList;
 	BonContainer**		lastContainer;
 
@@ -221,6 +222,8 @@ DoTempCalloc(BonTempMemoryAlloc alloc, void* userdata, jmp_buf* exceptionEnv, si
 	void* result = alloc(userdata, size);
 	if (!result) {
 		GiveUp(exceptionEnv, BON_STATUS_OUT_OF_MEMORY);
+	} else if ((uintptr_t)result & (uintptr_t)0x7u) {
+		GiveUp(exceptionEnv, BON_STATUS_UNALIGNED_MEMORY);
 	}
 	return memset(result, 0, size);
 }
@@ -329,10 +332,11 @@ ParseString(BonParsedJson* pj, BonStringEntry** pstringEntry) {
 
 	/* So now we know the minimum space we need to parse the string. Allocate it and also make sure there is space for a terminating null */
 	stringEntry = (BonStringEntry*)(pj->alloc)(pj->allocUserdata, bufferSize);
-	stringEntry->byteCount	= 0;
-	stringEntry->hash	= 0;
-	stringEntry->alias	= stringEntry;	/* I.e. no alias */
-	stringEntry->next	= 0;
+	stringEntry->next		= 0;
+	stringEntry->alias		= stringEntry;	/* I.e. no alias */
+	stringEntry->offset		= 0;
+	stringEntry->byteCount		= 0;
+	stringEntry->hash		= 0;
 
 	/* Immediately link the new string entry to the parent to avoid orphaning if the parsing below fails. */
 	*pstringEntry = stringEntry;
@@ -765,6 +769,8 @@ ParseNumberValue(BonParsedJson* pj, BonVariant* value) {
 
 	value->value.numberValue = StringToDouble((const char*)pj->cursor, pj->jsonStringEnd - pj->cursor, (const char**)&endptr);
 
+	/* TODO: Canonicalize. check for denormals, etc */
+
 	if (endptr == pj->cursor) {
 		GiveUp(pj->env, BON_STATUS_INVALID_NUMBER);
 	}
@@ -1059,8 +1065,10 @@ BonCreateRecordFromParsedJson(BonParsedJson* pj, void* recordMemory) {
 
 	/* Header */
 	header->magic			= BonFourCC('B', 'O', 'N', ' ');
-	header->reserved		= 0;
 	header->recordSize		= (uint32_t)pj->bonRecordSize;
+	header->reserved		= 0;
+	header->reserved1		= 0;
+	header->valueStringOffset	= (int32_t)RelativeOffset(&header->valueStringOffset, baseMemory, pj->valueStringOffset);
 	header->nameLookupTableOffset	= (int32_t)RelativeOffset(&header->nameLookupTableOffset, baseMemory, pj->nameLookupOffset);
 	header->rootValue		= MakeValueFromVariant(pj, &header->rootValue, &pj->rootValue);
 
@@ -1308,3 +1316,129 @@ BonWriteAsJsonToStream(const BonRecord* record, FILE* stream) {
 	printer.stream		= stream;
 	printAsJSON(&printer, BonGetRootValue(record), BON_TRUE, "");
 }
+
+static uint32_t
+DebugAbsoluteOffset(const void* from, const void* to, int32_t offset) {
+	return (uint32_t)((uint8_t*)to - (uint8_t*)from) + offset;
+}
+
+static void
+DebugWriteBonValue(const BonRecord* r, const BonValue* v, FILE* f) {
+	int32_t offset;
+	if (BonIsNullValue(v)) {
+		fprintf(f, "NULL\n");
+		return;
+	} 
+	switch (BonGetValueType(v)) {
+	case BON_VT_BOOL:
+		fprintf(f, "BOOL   %s\n", (BonAsBool(v) ? "true" : "false"));
+		return;
+	case BON_VT_NUMBER:
+		fprintf(f, "NUMBER %f\n", BonAsNumber(v));
+		return;
+	case BON_VT_STRING:
+		offset = ((const BonStringValue*)v)->offset;
+		fprintf(f, "STRING %5d (%08x)\n", offset, DebugAbsoluteOffset(r, v, offset));
+		return;
+	case BON_VT_ARRAY:
+		offset = ((const BonArrayValue*)v)->offset;
+		fprintf(f, "ARRAY  %5d (%08x)\n", offset, DebugAbsoluteOffset(r, v, offset));
+		return;
+	case BON_VT_OBJECT:
+		offset = ((const BonObjectValue*)v)->offset;
+		fprintf(f, "OBJECT %5d (%08x)\n", offset, DebugAbsoluteOffset(r, v, offset));
+		return;
+	default:
+		assert(0);
+	}
+}
+
+void
+BonDebugWrite(const BonRecord* r, FILE* stream) {
+	const uint64_t*			p;
+	const char*			pchar;
+	const uint64_t*			pvalueStrings		= (uint64_t*)((uint8_t*)&(r->valueStringOffset) + r->valueStringOffset);
+	const char*			pnameLookupTable	= ((char*)(&r->nameLookupTableOffset) + r->nameLookupTableOffset);
+	const BonContainerHeader*	container;
+	int32_t				i;
+
+	fprintf(stream,
+		"HEADER\n"
+		"00000000: magic                     : '%c%c%c%c'\n"
+		"00000004: recordSize                : %u\n"
+		"00000008: reserved                  : %d\n"
+		"0000000c: reserved1                 : %d\n"
+		"00000010: valueStringOffset         : %d (%08x)\n"
+		"00000014: nameLookupTableOffset     : %d (%08x)\n"
+		"00000018: rootValue                 : ",
+		((const char*)&r->magic)[0], 
+		((const char*)&r->magic)[1], 
+		((const char*)&r->magic)[2], 
+		((const char*)&r->magic)[3], 
+		r->recordSize, 
+		r->reserved, 
+		r->reserved1, 
+		r->valueStringOffset, 
+		r->valueStringOffset + 0x10,
+		r->nameLookupTableOffset, 
+		r->nameLookupTableOffset + 0x14);
+	DebugWriteBonValue(r, &r->rootValue, stream);
+
+	/* Objects and arrays */
+	fprintf(stream, "OBJECTS AND ARRAYS\n");
+	for (p = (const uint64_t*)&r[1]; p < pvalueStrings; ) {
+		container = (const BonContainerHeader*)p;
+		if (container->capacity > 0) {
+			fprintf(stream, "%08x: ARRAY  count %4d, capacity %5d\n", DebugAbsoluteOffset(r, p, 0), container->count, container->capacity);
+			++p;
+			for (i = 0; i < container->count; ++i) {
+				fprintf(stream, "%08x: %5d: ", DebugAbsoluteOffset(r, p, 0), i);
+				DebugWriteBonValue(r, (const BonValue*)p, stream);
+				++p;
+			}
+		} else {
+			fprintf(stream, "%08x: OBJECT count %4d, capacity %5d\n", DebugAbsoluteOffset(r, p, 0), container->count, container->capacity);
+			++p;
+			for (i = 0; i < container->count; ++i) {
+				fprintf(stream, "%08x: %5d: ", DebugAbsoluteOffset(r, p, 0), i);
+				DebugWriteBonValue(r, (const BonValue*)p, stream);
+				++p;
+			}
+			for (i = 0; i < container->count; i = i + 2) {
+				const BonName* names = (const BonName*)p;
+				fprintf(stream, "%08x: %5d: 0x%08x 0x%08x\n", DebugAbsoluteOffset(r, p, 0), i, names[0], names[1]);
+				++p;
+			}
+		}
+	}
+
+	/* Value strings */
+	/* TODO: unicode */
+	fprintf(stream, "VALUE STRINGS\n");
+	for (pchar = (const char*)p; pchar < pnameLookupTable; pchar = (const char*)(((size_t)pchar & ~0x7ull) + 8)) {
+		int len = strlen(pchar);
+		fprintf(stream, "%08x: %s\n", DebugAbsoluteOffset(r, pchar, 0), pchar);
+		pchar += len;
+	}
+	p = (const uint64_t*)pchar;
+
+	/* Name lookup table */
+	container = (const BonContainerHeader*)p;
+	fprintf(stream, "NAME LOOKUP TABLE\n%08x:  count %4d, capacity %5d\n", DebugAbsoluteOffset(r, p, 0), container->count, container->capacity);
+	++p;
+	for (i = 0; i < container->count; ++i) {
+		const BonNameAndOffset* nameAndOffset = (const BonNameAndOffset*)p;
+		fprintf(stream, "%08x: 0x%08x %5d (%08x)\n", DebugAbsoluteOffset(r, p, 0), nameAndOffset->name, nameAndOffset->offset, DebugAbsoluteOffset(r, &nameAndOffset->offset, nameAndOffset->offset));
+		++p;
+	}
+	
+	/* Name strings */
+	/* TODO: unicode */
+	fprintf(stream, "NAME STRINGS\n");
+	for (pchar = (const char*)p; pchar < (char*)r + r->recordSize; pchar = (const char*)(((size_t)pchar & ~0x7ull) + 8)) {
+		int len = strlen(pchar);
+		fprintf(stream, "%08x: %s\n", DebugAbsoluteOffset(r, pchar, 0), pchar);
+		pchar += len;
+	}
+}
+

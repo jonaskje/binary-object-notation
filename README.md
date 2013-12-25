@@ -45,8 +45,8 @@ Here are some ideas where this could be useful:
 
 A BON record consists of the following sections:
 1. Header
-2. Arrays
-3. Objects
+2. Objects
+3. Arrays
 4. Value strings
 5. Name to string lookup table
 6. Name strings
@@ -66,9 +66,11 @@ A JSON text is canonicalized into a BON record in the following way:
   @ represents a reference to another object in the object array. "b" is before "a" because the hash value for "b" is lower than for "a".
 - No duplicates of value strings are stored.
 - No duplicates of name strings.
+- Name and value strings are ordered by their hash (ascending order).
 - There may be an identical name string and value string, though. The reason for that is that the
   last two sections are not necessary to understand or use a record, so dropping them could be a
   space saving alternative for some applications.
+- Numbers are normalized (todo)
 
 ### 2.1 Values ###
 
@@ -148,9 +150,9 @@ typedef struct BonRecord {
 } BonRecord;
 ~~~
 
-### 2.2 Arrays ###
+### 2.2 Objects ###
 
-### 2.3 Objects ###
+### 2.3 Arrays ###
 
 ### 2.4 Value Strings ###
 

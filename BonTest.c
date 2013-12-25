@@ -105,7 +105,7 @@ ParseTests(void) {
 			if (expectedResult == BON_FALSE) {
 				printf("FAIL (-): %s\n", test);
 			} else {
-				if (!BonIsAValidRecord(br)) {
+				if (!BonIsAValidRecord(br, br->recordSize)) {
 					printf("FAIL (V): %s\n", test);
 				}
 				/*BonWriteAsJsonToStream(br, stdout);*/

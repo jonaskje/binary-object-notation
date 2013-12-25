@@ -3,7 +3,22 @@
 * @file
 */
 
-#include "BonFormat.h"
+#include <stdint.h>
+#include <stdlib.h>
+
+typedef uint64_t		BonValue;
+typedef uint32_t		BonName;
+typedef int			BonBool;
+
+#define BON_VT_NUMBER		0
+#define BON_VT_BOOL		1
+#define BON_VT_STRING		2
+#define BON_VT_ARRAY		3
+#define BON_VT_OBJECT		4
+#define BON_VT_NULL		7
+
+#define BON_FALSE		0
+#define BON_TRUE		1
 
 typedef struct BonObject {
 	int			count;
@@ -16,7 +31,17 @@ typedef struct BonArray {
 	const BonValue*		values;
 } BonArray;
 
-BonBool				BonIsAValidRecord(const BonRecord* br);
+typedef struct BonRecord {
+	uint32_t		magic;			/**< FourCC('B', 'O', 'N', ' ') */
+	uint32_t		recordSize;		/**< Total size of the entire record */
+	uint32_t		reserved;		/**< Must be 0 */
+	uint32_t		reserved1;		/**< Must be 0 */
+	int32_t			valueStringOffset;	/**< Offset to first value string &valueStringOffset */
+	int32_t			nameLookupTableOffset;	/**< Offset to name lookup table relative &nameLookupTableOffset */
+	BonValue		rootValue;		/**< Variant referencing the root value in the record (an array or an object) */
+} BonRecord;
+
+BonBool				BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes);
 uint32_t			BonGetRecordSize(const BonRecord* br);
 
 const char*			BonGetNameString(const BonRecord* br, BonName name);

@@ -14,7 +14,8 @@
 #define				BON_STATUS_JSON_PARSE_ERROR	2
 #define				BON_STATUS_JSON_NOT_UTF8	3
 #define				BON_STATUS_OUT_OF_MEMORY	4
-#define				BON_STATUS_INVALID_NUMBER	5
+#define				BON_STATUS_UNALIGNED_MEMORY	5		/**< Memory returned by allocator must be 8-byte aligned */
+#define				BON_STATUS_INVALID_NUMBER	6
 
 /* Must return a memory block with 8 byte alignment */
 typedef void*			(*BonTempMemoryAlloc)(		void*				userdata,		
@@ -111,3 +112,8 @@ BonRecord*			BonCreateRecordFromJson(	const char*			jsonString,
 								size_t				jsonStringByteCount);
 void				BonWriteAsJsonToStream(		const BonRecord*		record, 
 								FILE*				stream);
+
+
+void				BonDebugWrite(			const BonRecord* r, 
+								FILE* stream);
+

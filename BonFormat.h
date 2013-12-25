@@ -3,30 +3,7 @@
 * @file
 */
 
-#include <stdint.h>
-#include <stdlib.h>
-
-typedef uint64_t		BonValue;
-typedef uint32_t		BonName;
-typedef int			BonBool;
-
-#define BON_VT_NUMBER		0
-#define BON_VT_BOOL		1
-#define BON_VT_STRING		2
-#define BON_VT_ARRAY		3
-#define BON_VT_OBJECT		4
-#define BON_VT_NULL		7
-
-#define BON_FALSE		0
-#define BON_TRUE		1
-
-typedef struct BonRecord {
-	uint32_t		magic;			/* FourCC('B', 'O', 'N', ' ') */
-	uint32_t		reserved;		/* Must be 0 */
-	uint32_t		recordSize;		/* Total size of the entire record */
-	int32_t			nameLookupTableOffset;	/* Offset to name lookup table relative &nameLookupTableOffset */
-	BonValue		rootValue;		/* Variant referencing the root value in the record (an array or an object) */
-} BonRecord;
+#include "Bon.h"
 
 typedef struct BonArrayValue {
 	int32_t			type;
@@ -43,9 +20,19 @@ typedef struct BonStringValue {
 	int32_t			offset;
 } BonStringValue;
 
+typedef struct BonBoolValue {
+	int32_t			type;
+	int32_t			value;
+} BonBoolValue;
+
+/**
+ * A header for an object or an array.
+ * To differentiate between arrays and objects, objects have a negative capacity and arrays a
+ * positive capacity. A stored BON record always have abs(capacity)==abs(count).
+ */
 typedef struct BonContainerHeader {
-	int32_t			capacity;
-	int32_t			count;
+	int32_t			capacity;		/**< Container capacity */
+	int32_t			count;			/**< Number of items in the container */
 } BonContainerHeader;
 
 typedef struct BonNameAndOffset {

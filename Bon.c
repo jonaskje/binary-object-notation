@@ -1,4 +1,5 @@
 #include "Bon.h"
+#include "BonFormat.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -79,12 +80,19 @@ NameCompare(const void * a, const void * b) {
 /*---------------------------------------------------------------------------*/
 
 BonBool				
-BonIsAValidRecord(const BonRecord* br) {
+BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes) {
 	const char* magicChars;
-	if (!br)
+	if (!br) {
 		return BON_FALSE;
+	}
+	if (brSizeInBytes < sizeof(BonRecord)) {
+		return BON_FALSE;
+	}
 	magicChars = (const char*)&br->magic;
 	if (!(magicChars[0] == 'B' && magicChars[1] == 'O' && magicChars[2] == 'N' && magicChars[3] == ' ')) {
+		return BON_FALSE;
+	}
+	if (br->recordSize != brSizeInBytes) {
 		return BON_FALSE;
 	}
 	return BON_TRUE;
