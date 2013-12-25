@@ -17,10 +17,10 @@
 
 /* Tests starting with + are expected to succeed and those that start with - are expected to fail */
 static const char s_tests[] =
+	"+{\"apa\":false,\"Skill\":null,\"foo\":\"Hello\",\"child\":{\"apa\":96.0}}\0"
 	"+   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]			\0"
 	"+[false,true,null,false,\"apa\",{},[]]\0"
 	"+[1, 2.3, -1, 2.0e-1, 0.333e+23, 0.44E8, 123123123.4E-3]\0"
-	"+{\"apa\":false,\"Skill\":null,\"foo\":\"Hello\",\"child\":{\"apa\":96.0}}\0"
 	"+[]\0"
 	"+[false,true,null,false,\"apa\",{\"foo\":false},[\"a\",false,null]]\0"
 	"-[\0"
@@ -113,7 +113,7 @@ ParseTests(void) {
 					printf("FAIL (R): %s\n", test);
 				}
 
-				if (testNum == 0) {
+				if (testNum == 1) {
 					int i;
 					double d = 0.0;
 					BonArray ba = BonAsArray(BonGetRootValue(br));
@@ -225,7 +225,6 @@ BigTest(void) {
 
 int 
 main(int argc, char** argv) {
-	printf ("%08x %08x\n", BonCreateName("a", 1), BonCreateName("b", 1));
 	ParseTests();
 	/*BigTest();*/
 #ifdef _WIN32

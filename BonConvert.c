@@ -917,15 +917,6 @@ ComputeVariantOffsets(BonParsedJson* pj) {
 	pj->totalArraySize	= totalArraySize;
 }
 
-static void
-PrintStringList(const BonStringEntry* list) {
-	const BonStringEntry* p = list;
-	while (p) {
-		printf ("%c 0x%08x %s\n", (p->alias == p ? '*' : ' '), p->hash, (const char*)p->utf8);
-		p = p->next;
-	}
-}
-
 BonParsedJson*
 BonParseJson(BonTempMemoryAlloc tempAlloc, void* tempAllocUserdata, const char* jsonString, size_t jsonStringByteCount) {
 	BonParsedJson*		pj = 0;
@@ -983,7 +974,6 @@ BonParseJson(BonTempMemoryAlloc tempAlloc, void* tempAllocUserdata, const char* 
 		pj->totalNameStringSize = ComputeOffsetAndLinkAliasesInSortedList(&pj->totalNameStringCount, pj->nameStringList);
 		pj->totalNameLookupSize = 8;
 		pj->totalNameLookupSize += pj->totalNameStringCount * (sizeof(BonName) + sizeof(uint32_t)); /* Name, offset pair */
-		PrintStringList(pj->nameStringList);
 
 		BonSortList(&pj->valueStringList, BonStringEntry, NameCompare);
 		pj->totalValueStringSize = ComputeOffsetAndLinkAliasesInSortedList(0, pj->valueStringList);

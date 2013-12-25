@@ -74,7 +74,11 @@ Hash32(const void *data, uint32_t nbytes) {
 
 static int 
 NameCompare(const void * a, const void * b) {
-	return ((BonNameAndOffset*)a)->name - ((BonNameAndOffset*)b)->name;
+	uint32_t aname = ((BonNameAndOffset*)a)->name;
+	uint32_t bname = ((BonNameAndOffset*)b)->name;
+	if (aname < bname) return -1;
+	if (bname < aname) return 1;
+	return 0;
 }
 
 /*---------------------------------------------------------------------------*/

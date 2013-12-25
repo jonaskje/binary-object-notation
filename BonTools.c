@@ -55,24 +55,53 @@ WriteRecordToDisk(const BonRecord* br, const char* fn) {
 	return BON_TRUE;
 }
 
-#ifdef BONTOOL_BONDUMP
-void
-Usage() {
-	printf ("Dump a BON record in a raw format.\nUsage: BonDump <input bon-file>\n");
+static void
+Usage(const char* msg) {
+	fprintf (stderr, "%s", msg);
 	exit(-1);
 }
 
-int 
-main(int argc, char** argv) {
+static int 
+Json2Bon(int argc, char** argv) {
+	const char*		usage		= "Convert a JSON file to a BON record.\nUsage: Json2Bon <input json-file> <output bon-file>\n";
+	uint8_t*		jsonData;
+	size_t			jsonDataSize;
+	BonRecord*		record;
+
+	if (argc != 3) 
+		Usage(usage);
+	jsonData = LoadAll(&jsonDataSize, argv[1]);
+	if (!jsonData)
+		Usage(usage);
+	
+	record = BonCreateRecordFromJson((const char*)jsonData, jsonDataSize);
+	
+	free(jsonData);
+
+	if (!record) {
+		fprintf(stderr, "Failed to parse JSON file\n");
+		exit(-2);
+	}
+	if (!WriteRecordToDisk(record, argv[2]))
+		Usage(usage);
+
+	free(record);
+
+	return 0;
+}
+
+static int 
+DumpBon(int argc, char** argv) {
+	const char* usage = "Dump a BON record in a raw format.\nUsage: BonDump <input bon-file>\n";
 	uint8_t* bonData = 0;
 	size_t bonDataSize;
 	BonRecord* record = 0;
 
 	if (argc != 2) 
-		Usage();
+		Usage(usage);
 	bonData = LoadAll(&bonDataSize, argv[1]);
 	if (!bonData)
-		Usage();
+		Usage(usage);
 
 	record = (BonRecord*)bonData;
 	
@@ -84,42 +113,15 @@ main(int argc, char** argv) {
 	BonDebugWrite(record, stdout);
 	return 0;
 }
-#endif
 
-#ifdef BONTOOL_JSON2BON
-void
-Usage() {
-	printf ("Convert a JSON file to a BON record.\nUsage: Json2Bon <input json-file> <output bon-file>\n");
-	exit(-1);
-}
-
-int 
+int
 main(int argc, char** argv) {
-	uint8_t* jsonData;
-	size_t jsonDataSize;
-	BonRecord* record;
-
-	if (argc != 3) 
-		Usage();
-	jsonData = LoadAll(&jsonDataSize, argv[1]);
-	if (!jsonData)
-		Usage();
-	
-	record = BonCreateRecordFromJson((const char*)jsonData, jsonDataSize);
-	
-	free(jsonData);
-
-	if (!record) {
-		fprintf(stderr, "Failed to parse JSON file\n");
-		exit(-2);
-	}
-	if (!WriteRecordToDisk(record, argv[2]))
-		Usage();
-
-	free(record);
-
-	return 0;
-}
+#ifdef BONTOOL_JSON2BON
+	return Json2Bon(argc, argv);
 #endif
+#ifdef BONTOOL_DUMPBON
+	return DumpBon(argc, argv);
+#endif
+}
 
 
