@@ -15,7 +15,7 @@ features:
 
 BON is not a serialization format like BSON.
 
-1\. Introduction
+Introduction
 ---------------
 
 JSON is interesting and useful as an interchange format due to its simplicity and widespread use.
@@ -40,8 +40,53 @@ Here are some ideas where this could be useful:
 - Using BON records instead of JSON as runtime data as a faster alternative to JSON (for simpler
   games, for example).
 
-2\. BON Format
--------------
+Building
+--------------
+
+### OS X ###
+
+Run 'make'. Should work on any other unix-like, little-endian platform, too.
+
+### Windows ###
+
+Use bon.sln (*Not up to date at the moment!*)
+
+### Documentation ###
+
+Run 'doxygen bon.doxygen' in the root folder.
+
+Using
+--------------
+
+### Working with BON records from the command line? ###
+
+There are a few tools that are provided with this distribution that are useful for working with
+BON records from the command line.
+
+- Json2Bon : Convert a JSON text to a BON record.
+- Bon2Json : Convert a BON record to JSON text.
+- DumpBon : Debug tool for printing the contents of a BON record.
+
+### Just interested in reading existing BON records? ###
+
+Include the files:
+- Bon.h and 
+- Bon.c
+
+in your project and use the API in Bon.h.
+
+### Interested in transforming BON records from/to JSON? ###
+
+Include the files:
+- Bon.h, 
+- Bon.c, 
+- BonConvert.h and
+- BonConvert.c 
+
+in your project and use the API in Bon.h and BonConvert.h.
+
+BON Format
+--------------
 
 A BON record consists of the following sections (in this order):
 1. Header
@@ -72,7 +117,7 @@ A JSON text is converted and canonicalized into a BON record in the following wa
   space saving alternative for some applications.
 - Numbers are normalized (todo)
 
-### 2.1 Values ###
+### Values ###
 
 All values are represented by a 64-bit value named BonValue. It is interpreted differently based
 on the type. The type is stored in the 3 least significant bits of the 64-bit value.
@@ -93,11 +138,11 @@ need to store a pointer in the same slot as a string, object or array.
 A 32-bit value would be enough for all types except a number (double). Using floats for numbers
 would be too limiting since we would sacrifice 3 bits of the mantissa for the type.
 
-#### 2.1.1 Number Value ###
+#### Number Value ###
 
 A number is represented as a double with the 3 least significant bits of the mantissa set to 0.
 
-#### 2.1.2 Boolean Value ###
+#### Boolean Value ###
 
 A boolean BonValue should be interpreted as:
 
@@ -108,7 +153,7 @@ typedef struct BonBoolValue {
 } BonBoolValue;
 ~~~
 
-#### 2.1.3 String Value ###
+#### String Value ###
 
 A string BonValue should be interpreted as:
 
@@ -119,7 +164,7 @@ typedef struct BonStringValue {
 } BonStringValue;
 ~~~
 
-#### 2.1.4 Object Value ###
+#### Object Value ###
 
 An object BonValue should be interpreted as:
 
@@ -130,7 +175,7 @@ typedef struct BonObjectValue {
 } BonObjectValue;
 ~~~
 
-#### 2.1.5 Array Value ###
+#### Array Value ###
 
 An array BonValue should be interpreted as:
 ~~~
@@ -140,12 +185,12 @@ typedef struct BonArrayValue {
 } BonArrayValue;
 ~~~
 
-#### 2.1.6 Null Value ###
+#### Null Value ###
 
 Null is represented as (uint64\_t)7
 
 
-### 2.1 Header ###
+### Header ###
 
 The header is a binary representation of a BonRecord struct in little endian format.
 
@@ -161,7 +206,7 @@ typedef struct BonRecord {
 } BonRecord;
 ~~~
 
-### 2.2 Objects ###
+### Objects ###
 
 The first object (or array if there are no objects in the record) are stored directly after the
 header.
@@ -191,12 +236,12 @@ to parse the object linearly if the set of hashes are known by the application.
 
 The array of BonNames is padded with zeros up to an eight byte boundary.
 
-### 2.3 Arrays ###
+### Arrays ###
 
 Arrays are stored identically to an object. The difference is that the capacity is positive and
 that there is no BonName array.
 
-### 2.4 Value Strings ###
+### Value Strings ###
 
 In the value strings section all string type values are stored as null-terminated strings,
 starting at eight byte boundaries.
@@ -204,7 +249,7 @@ starting at eight byte boundaries.
 I.e. the string "purposes" would occupy 16 bytes since the length including null is 9 and it is
 padded to the nearest 8 byte boundary.
 
-### 2.5 Name to String Lookup Table ###
+### Name to String Lookup Table ###
 
 If the actual strings of the object members's keys are needed, they can be looked up in this
 table.
@@ -227,7 +272,7 @@ typedef struct BonNameAndOffset {
 } BonNameAndOffset;
 ~~~
 
-### 2.6 Name Strings ###
+### Name Strings ###
 
 Name strings are stored in the same way as value strings.
 

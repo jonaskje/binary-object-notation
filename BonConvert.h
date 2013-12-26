@@ -10,7 +10,8 @@
 
 
 /**
-* \addtogroup BonConvertHighLevel
+* \addtogroup BonConvertHighLevel BonConvert High Level API
+* \brief High level API for converting BON records to/from JSON. Lacks precise control of memory management and errors.
 * @{
 */
 #define				BON_STATUS_OK			0
@@ -22,10 +23,9 @@
 #define				BON_STATUS_INVALID_NUMBER	6
 /** @} */
 
-/* Low-level API */
-
 /**
-* \addtogroup BonConvertLowLevel
+* \addtogroup BonConvertLowLevel BonConvert Low Level API
+* \brief Low level API with more precise control of memory management and errors than the high level API.
 * @{
 */
 
@@ -150,9 +150,6 @@ BonRecord*			BonCreateRecordFromParsedJson(	struct BonParsedJson*		parsedJson,
 								void*				recordMemory);
 /** @} */
 
-
-/* High-level API */
-
 /**
 * \addtogroup BonConvertHighLevel
 * @{
@@ -186,6 +183,7 @@ void				BonWriteAsJsonToStream(		const BonRecord*		record,
 
 /**
 * \addtogroup BonConvertDebug
+* \brief Debug functions for development work.
 * @{
 */
 

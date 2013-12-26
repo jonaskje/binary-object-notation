@@ -116,10 +116,9 @@ ParseTests(void) {
 				if (testNum == 1) {
 					int i;
 					double d = 0.0;
-					BonArray ba = BonAsArray(BonGetRootValue(br));
-					const double* numbers = BonAsNumberArray(&ba);
+					BonNumberArray ba = BonAsNumberArray(BonGetRootValue(br));
 					for (i = 0; i < 10; ++i) {
-						if (d != numbers[i]) {
+						if (d != ba.values[i]) {
 							printf("FAIL (N): %s\n", test);
 							break;
 						}

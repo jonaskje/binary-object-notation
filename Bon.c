@@ -89,6 +89,11 @@ BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes) {
 	if (!br) {
 		return BON_FALSE;
 	}
+	if (((uintptr_t)br & (uintptr_t)0x7u) != 0) {				
+		/* BonRecords must be aligned to 8 byte to prevent unaligned access to data in the
+		 * record. */
+		return BON_FALSE;
+	}
 	if (brSizeInBytes < sizeof(BonRecord)) {
 		return BON_FALSE;
 	}
@@ -196,10 +201,19 @@ BonAsBool(const BonValue* bv) {
 	return (*((int32_t*)(bv) + 1));
 }
 
-const double*			
-BonAsNumberArray(const BonArray* ba) {
-	/* TODO: A debug check that all elements are BON_VT_NUMBER */
-	return (const double*)ba->values;
+BonNumberArray			
+BonAsNumberArray(const BonValue* bv) {
+	BonNumberArray o;
+	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+	if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
+		assert(0 && "Expected BON_VT_ARRAY");
+		o.count		= 0;
+		o.values	= 0;
+		return o;
+	}
+	o.count		= header->count;
+	o.values	= (const double*)&header[1];
+	return o;
 }
 
 BonName				

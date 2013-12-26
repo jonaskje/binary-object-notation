@@ -3,6 +3,13 @@
 /**
 * @file
 * \addtogroup Bon
+* \brief API for reading BON records.
+*
+* It is expected that the client has a BonRecord somewhere in memory, loaded from disk 
+* for example, and that the client knows the size of the record.
+*
+* Before accessing the BON record it is good to check that the BonRecord is valid by
+* calling BonIsAValidRecord.
 * @{
 */
 
@@ -34,43 +41,88 @@ typedef struct BonArray {
 	const BonValue*		values;
 } BonArray;
 
+typedef struct BonNumberArray {
+	int			count;
+	const double*		values;
+} BonNumberArray;
+
 /**
- * A BON record header.
+ * \brief A BON record header.
  */
 typedef struct BonRecord {
-	uint32_t		magic;			/**< FourCC('B', 'O', 'N', ' ') */
-	uint32_t		recordSize;		/**< Total size of the entire record */
-	uint32_t		reserved;		/**< Must be 0 */
-	uint32_t		reserved1;		/**< Must be 0 */
-	int32_t			valueStringOffset;	/**< Offset to first value string &valueStringOffset */
-	int32_t			nameLookupTableOffset;	/**< Offset to name lookup table relative &nameLookupTableOffset */
-	BonValue		rootValue;		/**< Variant referencing the root value in the record (an array or an object) */
+	uint32_t		magic;				/**< FourCC('B', 'O', 'N', ' ') */
+	uint32_t		recordSize;			/**< Total size of the entire record */
+	uint32_t		reserved;			/**< Must be 0 */
+	uint32_t		reserved1;			/**< Must be 0 */
+	int32_t			valueStringOffset;		/**< Offset to first value string &valueStringOffset */
+	int32_t			nameLookupTableOffset;		/**< Offset to name lookup table relative &nameLookupTableOffset */
+	BonValue		rootValue;			/**< Variant referencing the root value in the record (an array or an object) */
 } BonRecord;
 
-BonBool				BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes);
-uint32_t			BonGetRecordSize(const BonRecord* br);
+BonBool				BonIsAValidRecord(		const BonRecord* br, 
+								size_t brSizeInBytes);
 
-const char*			BonGetNameString(const BonRecord* br, BonName name);
-const BonValue*			BonGetRootValue(const BonRecord* br);
+uint32_t			BonGetRecordSize(		const BonRecord* br);
 
-int				BonGetValueType(const BonValue* value);
-BonBool				BonIsNullValue(const BonValue* value);
+const char*			BonGetNameString(		const BonRecord* br, 
+								BonName name);
 
-BonObject			BonAsObject(const BonValue* bv);
-BonArray			BonAsArray(const BonValue* bv);
-double				BonAsNumber(const BonValue* bv);
-const char*			BonAsString(const BonValue* bv);
-BonBool				BonAsBool(const BonValue* bv);
+/** 
+ * \brief Return a BON record's root value.
+ * A root value is always an array or an object. It can never be null.
+ */
+const BonValue*			BonGetRootValue(		const BonRecord* br);
 
-const double*			BonAsNumberArray(const BonArray* ba);
+/** 
+ * \brief Return the type of a value. 
+ * \sa BON_VT_NULL, BON_VT_BOOL, BON_VT_NUMBER, BON_VT_STRING, BON_VT_ARRAY, BON_VT_OBJECT 
+ */
+int				BonGetValueType(		const BonValue* value);
 
-BonName				BonCreateName(const char* nameString, size_t nameStringByteCount);
+/** Return BON_TRUE if a value is BON_VT_NULL. */
+BonBool				BonIsNullValue(			const BonValue* value);
+
+/** Read a value as a BON_VT_OBJECT. If bv is of another type, then return an empty object. */
+BonObject			BonAsObject(			const BonValue* bv);
+
+/** 
+ * \brief Read a value as a BON_VT_ARRAY. If bv is of another type, then return an empty array. 
+ * \sa BonAsNumberArray
+ */
+BonArray			BonAsArray(			const BonValue* bv);
+
+/** 
+ * \brief Read a value as an array of numbers. 
+ *
+ * This is a very efficient way of working on large arrays of numbers.
+ *
+ * Important! There is no error checking that the array is actually homogenous and only contains
+ * numbers. So this function also expects that you know what you are doing.
+ *
+ * If bv isn't a BON_VT_ARRAY then an empty array is returned.
+ * \sa BonAsArray
+ */
+BonNumberArray			BonAsNumberArray(		const BonValue* bv);
+
+/** Read a value as a BON_VT_NUMBER. If bv is of another type, then return 0.0 */
+double				BonAsNumber(			const BonValue* bv);
+
+/** Read a value as a BON_VT_STRING. If bv is of another type, then return an empty string (non-null)*/
+const char*			BonAsString(			const BonValue* bv);
+
+/** Read a value as a BON_VT_BOOL. If bv is of another type, then return BON_FALSE */
+BonBool				BonAsBool(			const BonValue* bv);
+
+/** Return the hash of a UTF-8 encoded sequence of bytes */
+BonName				BonCreateName(			const char* nameString, 
+								size_t nameStringByteCount);
 
 /** @} */
 
 /**
 * @file
 * \addtogroup BonFormat
+* \brief Structs and definitions that help when working with raw BON records. The functions in \ref Bon should be used instead of these if possible.
 * @{
 */
 
