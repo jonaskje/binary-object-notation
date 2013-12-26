@@ -9,8 +9,8 @@ features:
 - A BON record is memory mappable and mem moveable. No parsing or fixup required.
 - A BON record is canonical in the sense that two semantically identical JSON documents are
   represented by identical BON records. 
-- Homogenous arrays of numbers can be accessed as an array of doubles.
-- Object members are sorted by their keys's 32-bit murmur3 hashes. This makes linear parsing of an
+- Homogenous arrays of numbers can be accessed as a simple array of doubles.
+- Object members are sorted by their name's 32-bit murmur3 hashes. This makes linear parsing of an
   object's members possible. Searching for a key is log2(N), too.
 
 BON is not a serialization format like BSON.
@@ -22,7 +22,7 @@ JSON is interesting and useful as an interchange format due to its simplicity an
 Especially when considering doing anything in a browser with javascript.
 
 JSON is also a text based format which is not at all good for machine reading. The parsing portion
-is a big part when working with large JSON files.
+is a big and expensive part when working with large JSON files.
 
 The idea behind BON is to provide is a binary representation of a JSON file which can be used without any parsing
 at all.
@@ -43,7 +43,7 @@ Here are some ideas where this could be useful:
 2\. BON Format
 -------------
 
-A BON record consists of the following sections:
+A BON record consists of the following sections (in this order):
 1. Header
 2. Objects
 3. Arrays
@@ -54,7 +54,7 @@ A BON record consists of the following sections:
 A BON record is stored in little-endian format. Support for big-endian could easily be added by
 checking the magic value in the header.
 
-A JSON text is canonicalized into a BON record in the following way:
+A JSON text is converted and canonicalized into a BON record in the following way:
 - Members in objects are ordered by the hash of their key string - ascending order.
 - Arrays and objects are ordered breadth first. Arrays in the arrays section and objects in the
   objects section. E.g. the text { "a" : { "c": null }, "b" : { "d" : { "e" : null} }} has the following objects
@@ -86,49 +86,58 @@ on the type. The type is stored in the 3 least significant bits of the 64-bit va
 #define BON_VT_NULL		7
 ~~~
 
+The rationale for using a full 64-bit value for all these types is partly for simplicity when
+iterating over an array of items and partly because the in-place editing of a BON record sometimes
+need to store a pointer in the same slot as a string, object or array.
+
+A 32-bit value would be enough for all types except a number (double). Using floats for numbers
+would be too limiting since we would sacrifice 3 bits of the mantissa for the type.
+
 #### 2.1.1 Number Value ###
 
 A number is represented as a double with the 3 least significant bits of the mantissa set to 0.
 
 #### 2.1.2 Boolean Value ###
 
-A boolean BonValue can be thought of as casting a BonValue\* to the following BoolValue\*:
+A boolean BonValue should be interpreted as:
 
 ~~~
-struct BoolValue {
-	int32_t			type;		/* BON_VT_BOOL */
-	int32_t			boolValue;	/* 0 == false, 1 == true */
-};
+typedef struct BonBoolValue {
+	int32_t			type;			/**< BON_VT_BOOL **/
+	BonBool			value;			/**< BON_FALSE or BON_TRUE */
+} BonBoolValue;
 ~~~
 
 #### 2.1.3 String Value ###
 
+A string BonValue should be interpreted as:
+
 ~~~
-struct StringValue {
-	int32_t			type;		/* BON_VT_STRING */
-	int32_t			offset;		/* offset relative &stringValue where the string
-						 * is located in the record. */
-} stringValue;
+typedef struct BonStringValue {
+	int32_t			type;			/**< BON_VT_STRING **/
+	int32_t			offset;			/**< Address of this struct + offset points to the string */
+} BonStringValue;
 ~~~
 
 #### 2.1.4 Object Value ###
 
+An object BonValue should be interpreted as:
+
 ~~~
-struct ObjectValue {
-	int32_t			type;		/* BON_VT_OBJECT */
-	int32_t			offset;		/* offset relative &objectValue where the object
-						 * is located in the record. */
-} objectValue;
+typedef struct BonObjectValue {
+	int32_t			type;			/**< BON_VT_OBJECT **/
+	int32_t			offset;			/**< Address of this struct + offset points to the object */
+} BonObjectValue;
 ~~~
 
 #### 2.1.5 Array Value ###
 
+An array BonValue should be interpreted as:
 ~~~
-struct ArrayValue {
-	int32_t			type;		/* BON_VT_ARRAY */
-	int32_t			offset;		/* offset relative &arrayValue where the array
-						 * is located in the record. */
-} arrayValue;
+typedef struct BonArrayValue {
+	int32_t			type;			/**< BON_VT_ARRAY **/
+	int32_t			offset;			/**< Address of this struct + offset points to the array */
+} BonArrayValue;
 ~~~
 
 #### 2.1.6 Null Value ###
@@ -142,24 +151,84 @@ The header is a binary representation of a BonRecord struct in little endian for
 
 ~~~
 typedef struct BonRecord {
-	uint32_t		magic;			/* FourCC('B', 'O', 'N', ' ') */
-	uint32_t		reserved;		/* Must be 0 */
-	uint32_t		recordSize;		/* Total size of the entire record */
-	int32_t			nameLookupTableOffset;	/* Offset to name lookup table relative &nameLookupTableOffset */
-	BonValue		rootValue;		/* Variant referencing the root value in the record (an array or an object) */
+	uint32_t		magic;			/**< FourCC('B', 'O', 'N', ' ') */
+	uint32_t		recordSize;		/**< Total size of the entire record */
+	uint32_t		reserved;		/**< Must be 0 */
+	uint32_t		reserved1;		/**< Must be 0 */
+	int32_t			valueStringOffset;	/**< Offset to first value string &valueStringOffset */
+	int32_t			nameLookupTableOffset;	/**< Offset to name lookup table relative &nameLookupTableOffset */
+	BonValue		rootValue;		/**< Variant referencing the root value in the record (an array or an object) */
 } BonRecord;
 ~~~
 
 ### 2.2 Objects ###
 
+The first object (or array if there are no objects in the record) are stored directly after the
+header.
+
+The first eight bytes of an object is a container header:
+
+~~~
+typedef struct BonContainerHeader {
+	int32_t			capacity;		/**< Container capacity */
+	int32_t			count;			/**< Number of items in the container */
+} BonContainerHeader;
+~~~
+
+An object capacity is always negative. I.e. -5 means the capacity is 5.
+
+Abs(capacity) is always equal to count in a BON record stored on, say, disk. 
+
+The rationale for having space for a capacity there at all is for in-place editing purposes.
+
+After the header follows count number of BonValues.
+
+After that follows an array of count BonName which is the hash values of the object's member keys.
+I.e. BonValue at index 4 has a name in the BonName array at index 4.
+
+The BonNames are stored in ascending order which makes binary searching easy. It is also possible
+to parse the object linearly if the set of hashes are known by the application.
+
+The array of BonNames is padded with zeros up to an eight byte boundary.
+
 ### 2.3 Arrays ###
+
+Arrays are stored identically to an object. The difference is that the capacity is positive and
+that there is no BonName array.
 
 ### 2.4 Value Strings ###
 
+In the value strings section all string type values are stored as null-terminated strings,
+starting at eight byte boundaries.
+
+I.e. the string "purposes" would occupy 16 bytes since the length including null is 9 and it is
+padded to the nearest 8 byte boundary.
+
 ### 2.5 Name to String Lookup Table ###
+
+If the actual strings of the object members's keys are needed, they can be looked up in this
+table.
+
+It starts with a container header:
+
+~~~
+typedef struct BonContainerHeader {
+	int32_t			capacity;		/**< Container capacity */
+	int32_t			count;			/**< Number of items in the container */
+} BonContainerHeader;
+~~~
+
+And is followed by count BonNameAndOffset entries ordered by ascending name.
+
+~~~
+typedef struct BonNameAndOffset {
+	BonName			name;			/**< The hash of a object member's name. */
+	int32_t			offset;			/**< Address of offset + offset points to the name's string. */
+} BonNameAndOffset;
+~~~
 
 ### 2.6 Name Strings ###
 
-
+Name strings are stored in the same way as value strings.
 
 

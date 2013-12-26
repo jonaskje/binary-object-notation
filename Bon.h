@@ -1,6 +1,8 @@
 #pragma once
 /**
 * @file
+* \addtogroup Bon
+* @{
 */
 
 #include <stdint.h>
@@ -8,7 +10,7 @@
 
 typedef uint64_t		BonValue;
 typedef uint32_t		BonName;
-typedef int			BonBool;
+typedef int32_t			BonBool;
 
 #define BON_VT_NUMBER		0
 #define BON_VT_BOOL		1
@@ -31,6 +33,9 @@ typedef struct BonArray {
 	const BonValue*		values;
 } BonArray;
 
+/**
+ * A BON record header.
+ */
 typedef struct BonRecord {
 	uint32_t		magic;			/**< FourCC('B', 'O', 'N', ' ') */
 	uint32_t		recordSize;		/**< Total size of the entire record */
@@ -59,4 +64,6 @@ BonBool				BonAsBool(const BonValue* bv);
 const double*			BonAsNumberArray(const BonArray* ba);
 
 BonName				BonCreateName(const char* nameString, size_t nameStringByteCount);
+
+/** @} */
 

@@ -7,8 +7,11 @@
 
 #include <stdio.h>
 
-/* Low-level API */
 
+/**
+* \addtogroup BonConvertHighLevel
+* @{
+*/
 #define				BON_STATUS_OK			0
 #define				BON_STATUS_INVALID_JSON_TEXT	1
 #define				BON_STATUS_JSON_PARSE_ERROR	2
@@ -16,6 +19,14 @@
 #define				BON_STATUS_OUT_OF_MEMORY	4
 #define				BON_STATUS_UNALIGNED_MEMORY	5		/**< Memory returned by allocator must be 8-byte aligned */
 #define				BON_STATUS_INVALID_NUMBER	6
+/** @} */
+
+/* Low-level API */
+
+/**
+* \addtogroup BonConvertLowLevel
+* @{
+*/
 
 /* Must return a memory block with 8 byte alignment */
 typedef void*			(*BonTempMemoryAlloc)(		void*				userdata,		
@@ -103,9 +114,15 @@ size_t				BonGetBonRecordSize(		struct BonParsedJson*		parsedJson);
 
 BonRecord*			BonCreateRecordFromParsedJson(	struct BonParsedJson*		parsedJson, 
 								void*				recordMemory);
+/** @} */
 
 
 /* High-level API */
+
+/**
+* \addtogroup BonConvertHighLevel
+* @{
+*/
 
 /* Return a BonRecord allocated with standard malloc. */
 BonRecord*			BonCreateRecordFromJson(	const char*			jsonString, 
@@ -116,4 +133,6 @@ void				BonWriteAsJsonToStream(		const BonRecord*		record,
 
 void				BonDebugWrite(			const BonRecord* r, 
 								FILE* stream);
+/** @} */
+
 
