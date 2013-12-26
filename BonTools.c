@@ -1,3 +1,4 @@
+/* vi: set ts=8 sts=8 sw=8 noet: */
 #include "Bon.h"
 #include "BonConvert.h"
 

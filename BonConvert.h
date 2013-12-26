@@ -1,4 +1,5 @@
 #pragma once
+/* vi: set ts=8 sts=8 sw=8 noet: */
 /**
 * @file
 */
@@ -28,10 +29,27 @@
 * @{
 */
 
-/* Must return a memory block with 8 byte alignment */
+/**
+ * \brief An alloc callback for temporary working memory. 
+ *
+ * It's preferable to use a linear allocator instead of a heap allocator since this function is
+ * called intensively for large JSON files.
+ *
+ * @param userdata		A userdata parameter supplied by BonParseJson each call to BonTempMemoryAlloc
+ * @param byteCount		Number of bytes to allocate.
+ * @return			Must return a memory chunk of at least byteCount bytes aligned to an 8 byte boundary.
+ * \sa BonParseJson
+ */
 typedef void*			(*BonTempMemoryAlloc)(		void*				userdata,		
 								size_t				byteCount);
 
+/**
+ * \brief An free callback for temporary working memory. 
+ *
+ * @param userdata		A userdata parameter supplied by BonParseJson each call to BonTempMemoryAlloc
+ * @param ptr			Pointer to free
+ * \sa BonParseJson, BonFreeParsedJsonMemory
+ */
 typedef void			(*BonTempMemoryFree)(		void*				userdata, 
 								void*				ptr);
 
@@ -110,8 +128,24 @@ void				BonFreeParsedJsonMemory(	struct BonParsedJson*		parsedJson,
  */
 int				BonGetParsedJsonStatus(		struct BonParsedJson*		parsedJson);
 
+/**
+ * \brief Return the total size that will be required for a BON record representing the
+ * BonParsedJson.
+ *
+ * @param parsedJson		Intermediate representation of a parsed JSON text returned from BonParseJson.
+ * @return			Size in bytes that should be allocated to fit a BON record generated from parsedJson.
+ */
 size_t				BonGetBonRecordSize(		struct BonParsedJson*		parsedJson);
 
+/**
+ * \brief Convert an intermediate parsed JSON to a BON record.
+ *
+ * @param parsedJson		Intermediate representation of a parsed JSON text returned from BonParseJson.
+ * @param recordMemory		Memory where the BON record should be written to. Must be at least 
+ *				of the size returned from BonGetBonRecordSize.
+ * @return			A pointer to the newly created BON record (same as recordMemory
+ *				but correctly cast to a BonRecord)
+ */
 BonRecord*			BonCreateRecordFromParsedJson(	struct BonParsedJson*		parsedJson, 
 								void*				recordMemory);
 /** @} */
@@ -124,15 +158,48 @@ BonRecord*			BonCreateRecordFromParsedJson(	struct BonParsedJson*		parsedJson,
 * @{
 */
 
-/* Return a BonRecord allocated with standard malloc. */
-BonRecord*			BonCreateRecordFromJson(	const char*			jsonString, 
-								size_t				jsonStringByteCount);
+/** 
+ * \brief Parse a chunk of JSON and return a BON record. 
+ * 
+ * This function uses the standard malloc/free which can be very costly for large JSON files. 
+ * For more control of memory allocation and memory usage, see the low level API.
+ *
+ * @param jsonData		A sequence of UTF-8 encoded JSON data. Does not need to be null terminated.
+ * @param jsonDataSize		Size in bytes of the jsonData to parse.
+ * @return			A BON record allocated with malloc (need to be free:d by the caller). 
+ *                              Return null if anything failed. For more detailed error
+ *                              information you need to use the low level API.
+ */
+BonRecord*			BonCreateRecordFromJson(	const char*			jsonData, 
+								size_t				jsonDataSize);
+
+/** 
+ * \brief Write a BON record as JSON to a stream.
+ *
+ * @param record		The BON record to convert to JSON.
+ * @param stream		A stream to write to. E.g. stdout or a binary file.
+ */
 void				BonWriteAsJsonToStream(		const BonRecord*		record, 
 								FILE*				stream);
 
+/** @} */
 
-void				BonDebugWrite(			const BonRecord* r, 
-								FILE* stream);
+/**
+* \addtogroup BonConvertDebug
+* @{
+*/
+
+/** 
+ * \brief Write a BON record in a raw format to a stream.
+ *
+ * This is useful for debugging but has little practical use.
+ *
+ * @param record		The BON record to convert to JSON.
+ * @param stream		A stream to write to. E.g. stdout or a binary file.
+ */
+void				BonDebugWrite(			const BonRecord*		record, 
+								FILE*				stream);
+
 /** @} */
 
 

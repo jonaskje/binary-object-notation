@@ -1,3 +1,4 @@
+/* vi: set ts=8 sts=8 sw=8 noet: */
 #include "Bon.h"
 #include "BonConvert.h"
 
@@ -194,8 +195,7 @@ BigTest(void) {
 	clock_t start, end;
 	size_t jsonSize = 0;
 	uint8_t* json = LoadAll(&jsonSize, 
-		"c:\\Users\\Jonas\\Proj\\E2\\Data\\Kristian_skeleton.json"
-/*		"c:\\Users\\Jonas\\Proj\\E2\\Test\\bigtest.json"*/
+		"c:\\Users\\Jonas\\Proj\\E2\\Test\\bigtest.json"
 		);
 
 	const size_t		memSize = 1024 * 1024 * 256;

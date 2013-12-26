@@ -1,5 +1,5 @@
+/* vi: set ts=8 sts=8 sw=8 noet: */
 #include "BonConvert.h"
-#include "BonFormat.h"
 
 #include <stdlib.h>
 #include <assert.h>

@@ -1,7 +1,7 @@
 all: test tools
 
 O=BonConvert.o Bon.o
-D=BonConvert.h Bon.h BonFormat.h
+D=BonConvert.h Bon.h
 
 CC=clang
 CFLAGS=-g
