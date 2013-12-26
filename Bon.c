@@ -1,4 +1,4 @@
-/* vi: set ts=8 sts=8 sw=8 noet: */
+/* vi: set ts=8 sts=8 sw=8 et: */
 #include "Bon.h"
 
 #include <stdlib.h>
@@ -8,8 +8,8 @@
 #include <setjmp.h>
 #include <stdio.h>
 
-#define BON_VALUE_TYPE(v)	((int)(*(v) & 0x7ull))
-#define BON_VALUE_PTR(v)	((void*)((uint8_t*)(v) + (*((int32_t*)(v) + 1))))
+#define BON_VALUE_TYPE(v)       ((int)(*(v) & 0x7ull))
+#define BON_VALUE_PTR(v)        ((void*)((uint8_t*)(v) + (*((int32_t*)(v) + 1))))
 
 /*---------------------------------------------------------------------------*/
 /* Utilities */
@@ -23,201 +23,201 @@
  */
 static uint32_t 
 Hash32(const void *data, uint32_t nbytes) {
-	const uint32_t c1 = 0xcc9e2d51;
-	const uint32_t c2 = 0x1b873593;
-	const int nblocks = nbytes / 4;
-	const uint32_t *blocks = (const uint32_t *)(data);
-	const uint8_t *tail = (const uint8_t *)data + (nblocks * 4);
-	uint32_t h = 0;
-	int i;
-	uint32_t k;
+        const uint32_t c1 = 0xcc9e2d51;
+        const uint32_t c2 = 0x1b873593;
+        const int nblocks = nbytes / 4;
+        const uint32_t *blocks = (const uint32_t *)(data);
+        const uint8_t *tail = (const uint8_t *)data + (nblocks * 4);
+        uint32_t h = 0;
+        int i;
+        uint32_t k;
 
-	if (data == 0 || nbytes == 0)
-		return 0;
+        if (data == 0 || nbytes == 0)
+                return 0;
 
-	for (i = 0; i < nblocks; i++) {
-		k = blocks[i];
+        for (i = 0; i < nblocks; i++) {
+                k = blocks[i];
 
-		k *= c1;
-		k = (k << 15) | (k >> (32 - 15));
-		k *= c2;
+                k *= c1;
+                k = (k << 15) | (k >> (32 - 15));
+                k *= c2;
 
-		h ^= k;
-		h = (h << 13) | (h >> (32 - 13));
-		h = (h * 5) + 0xe6546b64;
-	}
+                h ^= k;
+                h = (h << 13) | (h >> (32 - 13));
+                h = (h * 5) + 0xe6546b64;
+        }
 
-	k = 0;
-	switch (nbytes & 3) {
-	case 3:
-		k ^= tail[2] << 16;
-	case 2:
-		k ^= tail[1] << 8;
-	case 1:
-		k ^= tail[0];
-		k *= c1;
-		k = (k << 13) | (k >> (32 - 15));
-		k *= c2;
-		h ^= k;
-	};
+        k = 0;
+        switch (nbytes & 3) {
+        case 3:
+                k ^= tail[2] << 16;
+        case 2:
+                k ^= tail[1] << 8;
+        case 1:
+                k ^= tail[0];
+                k *= c1;
+                k = (k << 13) | (k >> (32 - 15));
+                k *= c2;
+                h ^= k;
+        };
 
-	h ^= nbytes;
+        h ^= nbytes;
 
-	h ^= h >> 16;
-	h *= 0x85ebca6b;
-	h ^= h >> 13;
-	h *= 0xc2b2ae35;
-	h ^= h >> 16;
+        h ^= h >> 16;
+        h *= 0x85ebca6b;
+        h ^= h >> 13;
+        h *= 0xc2b2ae35;
+        h ^= h >> 16;
 
-	return h;
+        return h;
 }
 
 static int 
 NameCompare(const void * a, const void * b) {
-	uint32_t aname = ((BonNameAndOffset*)a)->name;
-	uint32_t bname = ((BonNameAndOffset*)b)->name;
-	if (aname < bname) return -1;
-	if (bname < aname) return 1;
-	return 0;
+        uint32_t aname = ((BonNameAndOffset*)a)->name;
+        uint32_t bname = ((BonNameAndOffset*)b)->name;
+        if (aname < bname) return -1;
+        if (bname < aname) return 1;
+        return 0;
 }
 
 /*---------------------------------------------------------------------------*/
 
-BonBool				
+BonBool                         
 BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes) {
-	const char* magicChars;
-	if (!br) {
-		return BON_FALSE;
-	}
-	if (((uintptr_t)br & (uintptr_t)0x7u) != 0) {				
-		/* BonRecords must be aligned to 8 byte to prevent unaligned access to data in the
-		 * record. */
-		return BON_FALSE;
-	}
-	if (brSizeInBytes < sizeof(BonRecord)) {
-		return BON_FALSE;
-	}
-	magicChars = (const char*)&br->magic;
-	if (!(magicChars[0] == 'B' && magicChars[1] == 'O' && magicChars[2] == 'N' && magicChars[3] == ' ')) {
-		return BON_FALSE;
-	}
-	if (br->recordSize != brSizeInBytes) {
-		return BON_FALSE;
-	}
-	return BON_TRUE;
+        const char* magicChars;
+        if (!br) {
+                return BON_FALSE;
+        }
+        if (((uintptr_t)br & (uintptr_t)0x7u) != 0) {                           
+                /* BonRecords must be aligned to 8 byte to prevent unaligned access to data in the
+                 * record. */
+                return BON_FALSE;
+        }
+        if (brSizeInBytes < sizeof(BonRecord)) {
+                return BON_FALSE;
+        }
+        magicChars = (const char*)&br->magic;
+        if (!(magicChars[0] == 'B' && magicChars[1] == 'O' && magicChars[2] == 'N' && magicChars[3] == ' ')) {
+                return BON_FALSE;
+        }
+        if (br->recordSize != brSizeInBytes) {
+                return BON_FALSE;
+        }
+        return BON_TRUE;
 }
 
-uint32_t			
+uint32_t                        
 BonGetRecordSize(const BonRecord* br) {
-	return br->recordSize;
+        return br->recordSize;
 }
 
 const char*
 BonGetNameString(const BonRecord* br, BonName name) {
-	BonContainerHeader*	header		= (BonContainerHeader*)((uint8_t*)&br->nameLookupTableOffset + br->nameLookupTableOffset);
-	BonNameAndOffset*	nameLookup	= (BonNameAndOffset*)(&header[1]);
-	BonNameAndOffset	key;
-	BonNameAndOffset*	item;
-	key.name		= name;
-	key.offset		= 0;
-	item = bsearch(&key, nameLookup, header->count, sizeof(BonNameAndOffset), NameCompare);
-	if (!item) {
-		return 0;
-	}
-	return (const char*)((uint8_t*)&item->offset + item->offset);
+        BonContainerHeader*     header          = (BonContainerHeader*)((uint8_t*)&br->nameLookupTableOffset + br->nameLookupTableOffset);
+        BonNameAndOffset*       nameLookup      = (BonNameAndOffset*)(&header[1]);
+        BonNameAndOffset        key;
+        BonNameAndOffset*       item;
+        key.name                = name;
+        key.offset              = 0;
+        item = bsearch(&key, nameLookup, header->count, sizeof(BonNameAndOffset), NameCompare);
+        if (!item) {
+                return 0;
+        }
+        return (const char*)((uint8_t*)&item->offset + item->offset);
 }
 
 const BonValue*
 BonGetRootValue(const BonRecord* br) {
-	return &br->rootValue;
+        return &br->rootValue;
 }
 
-int				
+int                             
 BonGetValueType(const BonValue* bv) {
-	return (int)(uint64_t)(*bv) & 0x7ull;
+        return (int)(uint64_t)(*bv) & 0x7ull;
 }
 
-BonBool				
+BonBool                         
 BonIsNullValue(const BonValue* value) {
-	return *value == 0x7ull;
+        return *value == 0x7ull;
 }
 
-BonObject			
+BonObject                       
 BonAsObject(const BonValue* bv) {
-	BonObject o;
-	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
-	if (BON_VALUE_TYPE(bv) != BON_VT_OBJECT) {
-		assert(0 && "Expected BON_VT_OBJECT");
-		o.count		= 0;
-		o.names		= 0;
-		o.values	= 0;
-		return o;
-	}
-	o.count		= header->count;
-	o.values	= (BonValue*)&header[1];
-	o.names		= (BonName*)&o.values[o.count];
-	return o;
+        BonObject o;
+        BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+        if (BON_VALUE_TYPE(bv) != BON_VT_OBJECT) {
+                assert(0 && "Expected BON_VT_OBJECT");
+                o.count         = 0;
+                o.names         = 0;
+                o.values        = 0;
+                return o;
+        }
+        o.count         = header->count;
+        o.values        = (BonValue*)&header[1];
+        o.names         = (BonName*)&o.values[o.count];
+        return o;
 }
 
-BonArray			
+BonArray                        
 BonAsArray(const BonValue* bv) {
-	BonArray o;
-	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
-	if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
-		assert(0 && "Expected BON_VT_ARRAY");
-		o.count		= 0;
-		o.values	= 0;
-		return o;
-	}
-	o.count		= header->count;
-	o.values	= (BonValue*)&header[1];
-	return o;
+        BonArray o;
+        BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+        if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
+                assert(0 && "Expected BON_VT_ARRAY");
+                o.count         = 0;
+                o.values        = 0;
+                return o;
+        }
+        o.count         = header->count;
+        o.values        = (BonValue*)&header[1];
+        return o;
 }
 
-double				
+double                          
 BonAsNumber(const BonValue* bv) {
-	if (BON_VALUE_TYPE(bv) != BON_VT_NUMBER) {
-		assert(0 && "Expected BON_VT_NUMBER");
-		return 0.0;
-	}
-	return *(double*)bv;
+        if (BON_VALUE_TYPE(bv) != BON_VT_NUMBER) {
+                assert(0 && "Expected BON_VT_NUMBER");
+                return 0.0;
+        }
+        return *(double*)bv;
 }
 
-const char*			
+const char*                     
 BonAsString(const BonValue* bv) {
-	if (BON_VALUE_TYPE(bv) != BON_VT_STRING) {
-		assert(0 && "Expected BON_VT_STRING");
-		return "";
-	}
-	return (const char*)BON_VALUE_PTR(bv);
+        if (BON_VALUE_TYPE(bv) != BON_VT_STRING) {
+                assert(0 && "Expected BON_VT_STRING");
+                return "";
+        }
+        return (const char*)BON_VALUE_PTR(bv);
 }
 
-BonBool				
+BonBool                         
 BonAsBool(const BonValue* bv) {
-	if (BON_VALUE_TYPE(bv) != BON_VT_BOOL) {
-		assert(0 && "Expected BON_VT_BOOL");
-		return BON_FALSE;
-	}
-	return (*((int32_t*)(bv) + 1));
+        if (BON_VALUE_TYPE(bv) != BON_VT_BOOL) {
+                assert(0 && "Expected BON_VT_BOOL");
+                return BON_FALSE;
+        }
+        return (*((int32_t*)(bv) + 1));
 }
 
-BonNumberArray			
+BonNumberArray                  
 BonAsNumberArray(const BonValue* bv) {
-	BonNumberArray o;
-	BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
-	if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
-		assert(0 && "Expected BON_VT_ARRAY");
-		o.count		= 0;
-		o.values	= 0;
-		return o;
-	}
-	o.count		= header->count;
-	o.values	= (const double*)&header[1];
-	return o;
+        BonNumberArray o;
+        BonContainerHeader* header = (BonContainerHeader*)BON_VALUE_PTR(bv);
+        if (BON_VALUE_TYPE(bv) != BON_VT_ARRAY) {
+                assert(0 && "Expected BON_VT_ARRAY");
+                o.count         = 0;
+                o.values        = 0;
+                return o;
+        }
+        o.count         = header->count;
+        o.values        = (const double*)&header[1];
+        return o;
 }
 
-BonName				
+BonName                         
 BonCreateName(const char* nameString, size_t nameStringByteCount) {
-	return Hash32(nameString, (uint32_t)nameStringByteCount);
+        return Hash32(nameString, (uint32_t)nameStringByteCount);
 }
 
