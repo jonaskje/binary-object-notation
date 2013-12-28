@@ -1,44 +1,36 @@
 BON - Binary Object Notation
 ============================
 
-Abstract
---------
-
-BON is an binary and complete representation of JSON with the following potentially interesting
-features:
-- A BON record is memory mappable and mem moveable. No parsing or fixup required.
-- A BON record is canonical in the sense that two semantically identical JSON documents are
-  represented by identical BON records. 
-- Homogenous arrays of numbers can be accessed as a simple array of doubles.
-- Object members are sorted by their name's 32-bit murmur3 hashes. This makes linear parsing of an
-  object's members possible. Searching for a key is log2(N), too.
-
-BON is not a serialization format like BSON.
-
 Introduction
 ---------------
 
-JSON is interesting and useful as an interchange format due to its simplicity and widespread use.
-Especially when considering doing anything in a browser with javascript.
+BON is an binary and memory mappable representation of JSON.
 
-JSON is also a text based format which is not at all good for machine reading. The parsing portion
-is a big and expensive part when working with large JSON files.
+It is intended to be used as a JSON replacement when the parsing of JSON is too expensive or an
+unnecessary step.
 
-The idea behind BON is to provide is a binary representation of a JSON file which can be used without any parsing
-at all.
+You might have a set of JSON files you edit occasionally but load often (let's say it's for a game). Here BON can be used as an intermediate representation to speed up loading.
+
+Or, in a little more complicated setup you serve both native and html/javascript clients with data
+and you don't want to pay for the JSON parsing cost in the native clients. So, you use BON
+internally and convert it to JSON only when delivering data to the html/javascript client that
+requires it. To native clients you send the BON records directly over the wire.
+
+A third use case for BON is for storing large numerical data sets in BON (like mesh data,
+animation data, etc). That kind of data is not really appropriate for JSON but is very efficient
+in BON.
+
+BON has the following properties:
+- A BON record is memory mappable. No parsing or fixup required.
+- A BON record is canonical in the sense that two semantically identical JSON documents are
+  represented by identical BON records. 
+- Homogenous arrays of numbers can be accessed as a simple array of doubles.
 
 What this project provides is:
 - A specification of the BON record format.
 - A C implementation for reading a BON record (src/Bon.h & src/Bon.c)
 - A C implementation for converting from JSON to a BON record and vice versa (src/BonConvert.h & src/BonConvert.c)
-- A C implementation for editing BON records without falling back to JSON. (src/Beon.h & src/Beon.c)
-
-Here are some ideas where this could be useful:
-- Caching parsed JSON files as BON records for faster loads.
-- Using BON records for storing and working with data and falling back to JSON only when it is
-  needed for interop.
-- Using BON records instead of JSON as runtime data as a faster alternative to JSON (for simpler
-  games, for example).
+- A C implementation for editing BON records without falling back to JSON. (src/Beon.h & src/Beon.c) (Not yet)
 
 Building
 --------------

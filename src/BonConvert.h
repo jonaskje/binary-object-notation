@@ -8,19 +8,18 @@
 
 #include <stdio.h>
 
-
 /**
 * \addtogroup BonConvertHighLevel BonConvert High Level API
 * \brief High level API for converting BON records to/from JSON. Lacks precise control of memory management and errors.
 * @{
 */
-#define                         BON_STATUS_OK                   0
-#define                         BON_STATUS_INVALID_JSON_TEXT    1
-#define                         BON_STATUS_JSON_PARSE_ERROR     2
-#define                         BON_STATUS_JSON_NOT_UTF8        3
-#define                         BON_STATUS_OUT_OF_MEMORY        4
-#define                         BON_STATUS_UNALIGNED_MEMORY     5               /**< Memory returned by allocator must be 8-byte aligned */
-#define                         BON_STATUS_INVALID_NUMBER       6
+#define                         BON_STATUS_OK                   0               /**< Successful operation. */
+#define                         BON_STATUS_INVALID_JSON_TEXT    1               /**< The JSON text was empty or had an invalid byte order mark. */
+#define                         BON_STATUS_JSON_PARSE_ERROR     2               /**< The JSON text contained one ore more syntax errors. */
+#define                         BON_STATUS_JSON_NOT_UTF8        3               /**< The JSON text was not UTF-8 encoded (the only supported encoding). */
+#define                         BON_STATUS_OUT_OF_MEMORY        4               /**< Memory allocator returned null. */
+#define                         BON_STATUS_UNALIGNED_MEMORY     5               /**< Memory allocator returned memory that wasn't 8-byte aligned */
+#define                         BON_STATUS_INVALID_NUMBER       6               /**< The JSON text contained a number that could not be converted to a double. */
 /** @} */
 
 /**
