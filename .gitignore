@@ -6,6 +6,8 @@ x64/*
 *.swp
 *.vsp
 *.dSYM
+.tundra-*
+tundra-output/*
 BonTest
 temp.json
 html/*
