@@ -29,9 +29,9 @@ at all.
 
 What this project provides is:
 - A specification of the BON record format.
-- A C implementation for reading a BON record (Bon.h/Bon.c)
-- A C implementation for converting from JSON to a BON record and vice versa (BonConvert.h/BonConvert.c)
-- A C implementation for editing BON records without falling back to JSON. (Beon.h/Beon.c)
+- A C implementation for reading a BON record (src/Bon.h & src/Bon.c)
+- A C implementation for converting from JSON to a BON record and vice versa (src/BonConvert.h & src/BonConvert.c)
+- A C implementation for editing BON records without falling back to JSON. (src/Beon.h & src/Beon.c)
 
 Here are some ideas where this could be useful:
 - Caching parsed JSON files as BON records for faster loads.
@@ -45,7 +45,10 @@ Building
 
 ### OS X ###
 
-Run 'make'. Should work on any other unix-like, little-endian platform, too.
+1. Get the tundra build system from https://github.com/deplinenoise/tundra 
+2. Run 'tundra' from the root directory. Should work on any other unix-like, little-endian platform, too.
+   - This will build the library and all tools and test code.
+3. Use the output from tundra-output/<config>
 
 ### Windows ###
 
@@ -53,7 +56,8 @@ Use bon.sln (*Not up to date at the moment!*)
 
 ### Documentation ###
 
-Run 'doxygen bon.doxygen' in the root folder.
+1. Run 'doxygen doc/bon.doxygen' from the root folder.
+2. Launch the html documentation from html/index.html
 
 Using
 --------------
