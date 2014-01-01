@@ -11,10 +11,20 @@ Build {
 			Tools = { "clang-osx" },
 		},
 		Config {
-			Name = "win64-msvc",
+			Name = "win64-vs2013",
 			DefaultOnHost = "windows",
-			Tools = { "msvc-vs2008"; TargetPlatform = "x64" },
+			Tools = { { "msvc-vs2013";  TargetArch = "x64" } },
 		},
+	},
+	Env = {
+		CXXOPTS = {
+			"/W4",
+			{ "/O2"; Config = "*-vs2013-release" },
+		},
+		GENERATE_PDB = {
+			{ "0"; Config = "*-vs2013-release" },
+			{ "1"; Config = { "*-vs2013-debug", "*-vs2013-production" } },
+		}
 	},
 	Units = function()
 		StaticLibrary {
@@ -54,5 +64,22 @@ Build {
 		Default "Bon2Json"
 		Default "DumpBon"
 	end,
+	IdeGenerationHints = {
+		Msvc = {
+			-- Remap config names to MSVC platform names (affects things like header scanning & debugging)
+			PlatformMappings = {
+				['win64-vs2013'] = 'x64',
+				['win32-vs2013'] = 'Win32',
+			},
+			-- Remap variant names to MSVC friendly names
+			VariantMappings = {
+				['release']    = 'Release',
+				['debug']      = 'Debug',
+				['production'] = 'Production',
+			},
+		},
+	-- Override output directory for sln/vcxproj files.
+		MsvcSolutionDir = 'vs2013',
+	},
 }
 

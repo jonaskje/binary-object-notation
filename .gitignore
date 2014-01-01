@@ -12,4 +12,6 @@ BonTest
 temp.json
 html/*
 latex/*
-
+vs2013/*
+.tundra2*
+t2-output/
