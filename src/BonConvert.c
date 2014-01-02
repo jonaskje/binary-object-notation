@@ -1422,7 +1422,7 @@ BonDebugWrite(const BonRecord* r, FILE* stream) {
         /* TODO: unicode */
         fprintf(stream, "VALUE STRINGS\n");
         for (pchar = (const char*)p; pchar < pnameLookupTable; pchar = (const char*)(((size_t)pchar & ~0x7ull) + 8)) {
-                int len = strlen(pchar);
+                size_t len = strlen(pchar);
                 fprintf(stream, "%08x: %s\n", DebugAbsoluteOffset(r, pchar, 0), pchar);
                 pchar += len;
         }
@@ -1442,7 +1442,7 @@ BonDebugWrite(const BonRecord* r, FILE* stream) {
         /* TODO: unicode */
         fprintf(stream, "NAME STRINGS\n");
         for (pchar = (const char*)p; pchar < (char*)r + r->recordSize; pchar = (const char*)(((size_t)pchar & ~0x7ull) + 8)) {
-                int len = strlen(pchar);
+                size_t len = strlen(pchar);
                 fprintf(stream, "%08x: %s\n", DebugAbsoluteOffset(r, pchar, 0), pchar);
                 pchar += len;
         }

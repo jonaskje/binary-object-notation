@@ -17,13 +17,14 @@ Build {
 		},
 	},
 	Env = {
-		CXXOPTS = {
-			"/W4",
-			{ "/O2"; Config = "*-vs2013-release" },
+		CPPDEFS = { "_CRT_SECURE_NO_WARNINGS" },
+		CCOPTS = {
+			"/W4", "/WX",
+			"/wd4100", "/wd4127", 
+			{ "/O2", "/d2Zi+"; Config = "*-vs2013-release" },
 		},
 		GENERATE_PDB = {
-			{ "0"; Config = "*-vs2013-release" },
-			{ "1"; Config = { "*-vs2013-debug", "*-vs2013-production" } },
+			{ "1"; Config = { "*-vs2013-*" } },
 		}
 	},
 	Units = function()
