@@ -6,6 +6,10 @@
 
 #include "Bon.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 
 /**
@@ -196,6 +200,11 @@ void                            BonWriteAsJsonToStream(         const BonRecord*
  */
 void                            BonDebugWrite(                  const BonRecord*                record, 
                                                                 FILE*                           stream);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 /** @} */
 

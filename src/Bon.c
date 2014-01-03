@@ -94,14 +94,14 @@ BonIsAValidRecord(const BonRecord* br, size_t brSizeInBytes) {
                  * record. */
                 return BON_FALSE;
         }
-        if (brSizeInBytes < sizeof(BonRecord)) {
+        if (brSizeInBytes > 0 && brSizeInBytes < sizeof(BonRecord)) {
                 return BON_FALSE;
         }
         magicChars = (const char*)&br->magic;
         if (!(magicChars[0] == 'B' && magicChars[1] == 'O' && magicChars[2] == 'N' && magicChars[3] == ' ')) {
                 return BON_FALSE;
         }
-        if (br->recordSize != brSizeInBytes) {
+        if (brSizeInBytes > 0 && br->recordSize != brSizeInBytes) {
                 return BON_FALSE;
         }
         return BON_TRUE;
@@ -220,4 +220,116 @@ BonName
 BonCreateName(const char* nameString, size_t nameStringByteCount) {
         return Hash32(nameString, (uint32_t)nameStringByteCount);
 }
+
+BonName
+BonCreateNameCstr(const char* nameString) {
+	return Hash32(nameString, (uint32_t)strlen(nameString));
+}
+
+
+int 
+BonFindIndexOfName(const BonName* names, int nameCount, BonName value) {
+	const int64_t value64 = (int64_t)value;
+	int l = 0;
+	int h = nameCount - 1;
+	while (l <= h) {
+		const int m = (l + h) / 2;
+		int64_t diff = (int64_t)names[m] - value64;
+		if (diff < 0)
+			l = m + 1;
+		else if (diff > 0)
+			h = m - 1;
+		else
+			return m;
+	}
+	return -1;
+}
+
+int                             
+BonGetMemberValueType(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonGetValueType(&object->values[i]);
+	} else {
+		return BON_VT_NULL;
+	}
+}
+
+BonBool                         
+BonIsMemberNullValue(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	return i < 0 || BonIsNullValue(&object->values[i]);
+}
+
+
+BonObject                       
+BonMemberAsObject(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsObject(&object->values[i]);
+	} else {
+		const BonObject empty = {0};
+		return empty;
+	}
+}
+
+
+BonArray                        
+BonMemberAsArray(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsArray(&object->values[i]);
+	} else {
+		const BonArray empty = {0};
+		return empty;
+	}
+}
+
+
+BonNumberArray                  
+BonMemberAsNumberArray(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsNumberArray(&object->values[i]);
+	} else {
+		const BonNumberArray empty = {0};
+		return empty;
+	}
+}
+
+
+double                          
+BonMemberAsNumber(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsNumber(&object->values[i]);
+	} else {
+		return 0.0;
+	}
+}
+
+
+const char*                     
+BonMemberAsString(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsString(&object->values[i]);
+	} else {
+		return "";
+	}
+}
+
+
+BonBool                         
+BonMemberAsBool(const BonObject* object, BonName name) {
+	int i = BonFindIndexOfName(object->names, object->count, name);
+	if (i >= 0) {
+		return BonAsBool(&object->values[i]);
+	} else {
+		return BON_FALSE;
+	}
+}
+
+
+
 

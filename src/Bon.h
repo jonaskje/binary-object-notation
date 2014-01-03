@@ -16,6 +16,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef uint64_t                BonValue;
 typedef uint32_t                BonName;
 typedef int32_t                 BonBool;
@@ -59,6 +63,9 @@ typedef struct BonRecord {
         BonValue                rootValue;                      /**< Variant referencing the root value in the record (an array or an object) */
 } BonRecord;
 
+/**
+ * @param brSizeInBytes - either zero (don't do any size checks) or equal the size of the BonRecord.
+ */
 BonBool                         BonIsAValidRecord(              const BonRecord* br, 
                                                                 size_t brSizeInBytes);
 
@@ -116,6 +123,40 @@ BonBool                         BonAsBool(                      const BonValue* 
 /** Return the hash of a UTF-8 encoded sequence of bytes */
 BonName                         BonCreateName(                  const char* nameString, 
                                                                 size_t nameStringByteCount);
+
+/** Return the hash of a null-terminated UTF-8 encoded sequence of bytes */
+BonName                         BonCreateNameCstr(              const char* nameString);
+
+/** Return index of value in sorted array names. Return -1 if value is not in the names array. */
+int                             BonFindIndexOfName(             const BonName* names,
+	                                                        int nameCount,
+								BonName value);
+
+
+
+int                             BonGetMemberValueType(          const BonObject* object,
+                                                                BonName name);
+
+BonBool                         BonIsMemberNullValue(           const BonObject* object,
+                                                                BonName name);
+
+BonObject                       BonMemberAsObject(              const BonObject* object,      
+                                                                BonName name);
+
+BonArray                        BonMemberAsArray(               const BonObject* object,
+                                                                BonName name);
+
+BonNumberArray                  BonMemberAsNumberArray(         const BonObject* object,
+                                                                BonName name);
+
+double                          BonMemberAsNumber(              const BonObject* object,
+                                                                BonName name);
+
+const char*                     BonMemberAsString(              const BonObject* object,
+                                                                BonName name);
+
+BonBool                         BonMemberAsBool(                const BonObject* object,
+                                                                BonName name);
 
 /** @} */
 
@@ -175,5 +216,10 @@ typedef struct BonNameAndOffset {
         BonName                 name;                   /**< The hash of a object member's name. */
         int32_t                 offset;                 /**< Address of offset + offset points to the name's string. */
 } BonNameAndOffset;
+
+
+#ifdef __cplusplus
+}
+#endif
 
 /** @} */

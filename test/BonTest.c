@@ -221,8 +221,64 @@ BigTest(void) {
         printf("Elapsed: %8.4f\n", (float)(end - start)/CLOCKS_PER_SEC);
 }
 
+
+__declspec(noinline) int FindIndexOfName(const BonName* names, int nameCount, BonName value)
+{
+	const int64_t value64 = (int64_t)value;
+	int l = 0;
+	int h = nameCount - 1;
+	while (l <= h) {
+		const int m = (l + h) / 2;
+		int64_t diff = (int64_t)names[m] - value64;
+		if (diff < 0)
+			l = m + 1;
+		else if (diff > 0)
+			h = m - 1;
+		else
+			return m;
+	}
+	return -1;
+}
+
+void
+SearchTest(void) {
+	BonName names[] = { 1u, 39823u, 77777u };
+	BonName names2[] = { 5u };
+	if (BonFindIndexOfName(names, 3, 1u) != 0) {
+		printf("FAIL (SEARCH): 0\n");
+	}
+	if (BonFindIndexOfName(names, 3, 39823u) != 1) {
+		printf("FAIL (SEARCH): 1\n");
+	}
+	if (BonFindIndexOfName(names, 3, 77777u) != 2) {
+		printf("FAIL (SEARCH): 2\n");
+	}
+	if (BonFindIndexOfName(names, 3, 5u) != -1) {
+		printf("FAIL (SEARCH): 3\n");
+	}
+	if (BonFindIndexOfName(names, 3, 0u) != -1) {
+		printf("FAIL (SEARCH): 4\n");
+	}
+	if (BonFindIndexOfName(names, 3, 0xffffffffu) != -1) {
+		printf("FAIL (SEARCH): 5\n");
+	}
+	if (BonFindIndexOfName(names, 0, 123u) != -1) {
+		printf("FAIL (SEARCH): 6\n");
+	}
+	if (BonFindIndexOfName(names2, 1, 2u) != -1) {
+		printf("FAIL (SEARCH): 7\n");
+	}
+	if (BonFindIndexOfName(names2, 1, 5u) != 0) {
+		printf("FAIL (SEARCH): 8\n");
+	}
+	if (BonFindIndexOfName(names2, 1, 123123u) != -1) {
+		printf("FAIL (SEARCH): 9\n");
+	}
+}
+
 int 
 main(int argc, char** argv) {
+	SearchTest();
         ParseTests();
         /*BigTest();*/
 #ifdef _WIN32
